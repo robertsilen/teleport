@@ -21,6 +21,16 @@ addr = "example.com:3025"
 api_key = "api_key"                 # Datadog API Key
 application_key = "application_key" # Datadog Application Key
 
+[role_to_recipients]
+# Map roles to recipients.
+#
+# Provide datadog user_email/team recipients for access requests for specific roles.
+# role.suggested_reviewers will automatically be treated as additional email recipients.
+# "*" must be provided to match non-specified roles.
+#
+# "dev" = "dev-team"
+# "*" = ["cloud@email.com", "cloud-team"]
+
 [log]
 output = "stderr" # Logger output. Could be "stdout", "stderr" or "/var/lib/teleport/datadog.log"
 severity = "INFO" # Logger severity. Could be "INFO", "ERROR", "DEBUG" or "WARN".

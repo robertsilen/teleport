@@ -92,7 +92,7 @@ func (a *App) Init(baseApp *common.BaseApp) error {
 		PluginType:             a.pluginType,
 		FetchRecipientCallback: a.bot.FetchRecipient,
 	})
-	a.accessRequestUser = teleport.SystemAccessApproverUserName
+	a.accessRequestUser = baseApp.Conf.GetTeleportUser()
 
 	return nil
 }
@@ -544,6 +544,8 @@ func (a *App) getResourceNames(ctx context.Context, req types.AccessRequest) ([]
 	return resourceNames, nil
 }
 
+// tryApproveRequest attempts to automatically approve the access request if the
+// user is on call for the configured service/team.
 func (a *App) tryApproveRequest(ctx context.Context, reqID string, reqData pd.AccessRequestData) error {
 	log := logger.Get(ctx).
 		WithField("req_id", reqID).

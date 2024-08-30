@@ -20,8 +20,11 @@ package datadog
 
 import (
 	"context"
+	"fmt"
+	"net/url"
 	"slices"
 	"strings"
+	"text/template"
 
 	"github.com/gravitational/trace"
 
@@ -29,14 +32,40 @@ import (
 	"github.com/gravitational/teleport/api/types/accesslist"
 	"github.com/gravitational/teleport/integrations/access/accessrequest"
 	"github.com/gravitational/teleport/integrations/access/common"
-	"github.com/gravitational/teleport/integrations/lib/logger"
+	"github.com/gravitational/teleport/integrations/lib"
 	pd "github.com/gravitational/teleport/integrations/lib/plugindata"
 )
 
+// AutoApprovalsAnnotation defines the datadog auto approvals label.
+const AutoApprovalsAnnotation = "datadog_auto_approvals"
+
+// Bot is a Datadog client that works with AccessRequest.
+// It is responsible for creating/updating Datadog incidents when access request
+// events occur.
 type Bot struct {
 	datadog     *Datadog
 	clusterName string
+	webProxyURL *url.URL
 }
+
+var incidentSummaryTemplate = template.Must(template.New("incident summary").Parse(
+	`You have a new Access Request:
+
+ID: {{.ID}}
+Cluster: {{.ClusterName}}
+User: {{.User}}
+Role(s): {{range $index, $element := .Roles}}{{if $index}}, {{end}}{{ . }}{{end}}
+{{if .RequestLink}}Link: {{.RequestLink}}{{end}} `,
+))
+var reviewNoteTemplate = template.Must(template.New("review note").Parse(
+	`{{.Author}} reviewed the request.
+Resolution: {{.ProposedState}}.
+{{if .Reason}}Reason: {{.Reason}}.{{end}}`,
+))
+var resolutionNoteTemplate = template.Must(template.New("resolution note").Parse(
+	`Access request is {{.Resolution}}
+{{if .ResolveReason}}Reason: {{.ResolveReason}}{{end}}`,
+))
 
 // SupportedApps are the apps supported by this bot.
 func (b Bot) SupportedApps() []common.App {
@@ -45,67 +74,96 @@ func (b Bot) SupportedApps() []common.App {
 	}
 }
 
+// CheckHealth checks if Datadog connection is healthy.
 func (b Bot) CheckHealth(ctx context.Context) error {
 	return trace.Wrap(b.datadog.CheckHealth(ctx))
 }
 
+// SendReviewReminders will send a review reminder that an access list needs to be reviewed.
 func (b Bot) SendReviewReminders(ctx context.Context, recipient common.Recipient, accessLists []*accesslist.AccessList) error {
 	return trace.NotImplemented("access list review reminder is not implemented for plugin")
 }
 
+// BroadcastAccessRequestMessage creates an incident for the provided recipients.
 func (b Bot) BroadcastAccessRequestMessage(ctx context.Context, recipients []common.Recipient, reqID string, reqData pd.AccessRequestData) (accessrequest.SentMessages, error) {
-	var data accessrequest.SentMessages
-	incidentData, err := b.datadog.CreateIncident(ctx, b.clusterName, reqID, recipients, reqData)
+	summary, err := buildIncidentSummary(b.clusterName, reqID, reqData, b.webProxyURL)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	incidentData, err := b.datadog.CreateIncident(ctx, summary, recipients, reqData)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	var data accessrequest.SentMessages
 	data = append(data, accessrequest.MessageData{ChannelID: incidentData.ID, MessageID: incidentData.ID})
-
 	return data, nil
 }
 
+// PostReviewReply posts an incident note.
 func (b Bot) PostReviewReply(ctx context.Context, channelID, _ string, review types.AccessReview) error {
-	return trace.Wrap(b.datadog.PostReviewNote(ctx, channelID, review))
+	note, err := buildReviewNoteBody(review)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	return trace.Wrap(b.datadog.PostReviewNote(ctx, channelID, note))
 }
 
+// NotifyUser will send users a direct notice with the access request status.
 func (b Bot) NotifyUser(ctx context.Context, reqID string, reqData pd.AccessRequestData) error {
 	return trace.NotImplemented("notify user is not implemented for plugin")
 }
 
+// UpdateMessages updates the indicent.
 func (b Bot) UpdateMessages(ctx context.Context, reqID string, reqData pd.AccessRequestData, incidents accessrequest.SentMessages, reviews []types.AccessReview) error {
 	var errors []error
+
+	state := "active"
+	switch reqData.ResolutionTag {
+	case pd.ResolvedApproved, pd.ResolvedDenied, pd.ResolvedExpired:
+		state = "resolved"
+	}
+
+	note, err := buildResolutionNoteBody(reqData)
+	if err != nil {
+		return trace.Wrap(err)
+	}
 	for _, incident := range incidents {
-		err := b.datadog.ResolveIncident(ctx, incident.ChannelID, reqData, reviews)
+		if err := b.datadog.PostReviewNote(ctx, incident.ChannelID, note); err != nil {
+			errors = append(errors, trace.Wrap(err))
+			continue
+		}
+		err := b.datadog.ResolveIncident(ctx, incident.ChannelID, state)
 		errors = append(errors, trace.Wrap(err))
 	}
 	return trace.NewAggregate(errors...)
 }
 
+// FetchRecipient fetches the  recipient for the given name.
 func (b Bot) FetchRecipient(ctx context.Context, name string) (*common.Recipient, error) {
+	var kind string
+	if lib.IsEmail(name) {
+		kind = common.RecipientKindEmail
+	} else {
+		kind = common.RecipientKindTeam
+	}
 	return &common.Recipient{
 		Name: name,
 		ID:   name,
-		Kind: common.RecipientKindTeam,
-		Data: nil,
+		Kind: kind,
 	}, nil
 }
 
+// FetchOncallUsers fetches on-call users filtered by the provided annotations.
 func (b Bot) FetchOncallUsers(ctx context.Context, reqData pd.AccessRequestData) ([]string, error) {
 	oncallTeams, err := b.datadog.GetOncallTeams(ctx)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	teamNames := getTeamNamesFromAnnotations(reqData, "datadog_auto_approvals")
-
-	log := logger.Get(ctx)
-	log.WithField("oncall_teams", oncallTeams).Info("Fetch oncall teams")
+	teamNames := getTeamNamesFromAnnotations(reqData, AutoApprovalsAnnotation)
 
 	var oncallUserIDs []string
 	for _, oncallTeam := range oncallTeams.Data {
 		if !slices.Contains(teamNames, strings.TrimSpace(oncallTeam.Attributes.Handle)) && !slices.Contains(teamNames, strings.TrimSpace(oncallTeam.Attributes.Name)) {
-			log.WithField("oncall_team_name", oncallTeam.Attributes.Name).
-				WithField("oncall_team_handle", oncallTeam.Attributes.Handle).
-				Info("oncall team does not match")
 			continue
 		}
 		for _, oncallUser := range oncallTeam.Relationships.OncallUsers.Data {
@@ -119,12 +177,6 @@ func (b Bot) FetchOncallUsers(ctx context.Context, reqData pd.AccessRequestData)
 			oncallUserEmails = append(oncallUserEmails, user.Attributes.Email)
 		}
 	}
-
-	log.WithField("team_names", teamNames).
-		WithField("oncall_user_ids", oncallUserIDs).
-		WithField("oncall_user_emails", oncallUserEmails).
-		Info("Fetch oncall users")
-
 	return oncallUserEmails, nil
 }
 
@@ -132,4 +184,79 @@ func getTeamNamesFromAnnotations(reqData pd.AccessRequestData, annotationKey str
 	teamNames := reqData.SystemAnnotations[annotationKey]
 	slices.Sort(teamNames)
 	return slices.Compact(teamNames)
+}
+
+func buildIncidentSummary(clusterName, reqID string, reqData pd.AccessRequestData, webProxyURL *url.URL) (string, error) {
+	var requestLink string
+	if webProxyURL != nil {
+		reqURL := *webProxyURL
+		reqURL.Path = lib.BuildURLPath("web", "requests", reqID)
+		requestLink = reqURL.String()
+	}
+
+	var builder strings.Builder
+	err := incidentSummaryTemplate.Execute(&builder, struct {
+		ID          string
+		ClusterName string
+		RequestLink string
+		pd.AccessRequestData
+	}{
+		reqID,
+		clusterName,
+		requestLink,
+		reqData,
+	})
+	if err != nil {
+		return "", trace.Wrap(err)
+	}
+	return builder.String(), nil
+}
+
+func buildReviewNoteBody(review types.AccessReview) (string, error) {
+	var builder strings.Builder
+	err := reviewNoteTemplate.Execute(&builder, struct {
+		Author        string
+		ProposedState string
+		Reason        string
+	}{
+		review.Author,
+		review.ProposedState.String(),
+		review.Reason,
+	})
+	if err != nil {
+		return "", trace.Wrap(err)
+	}
+	return builder.String(), nil
+}
+
+func buildResolutionNoteBody(reqData pd.AccessRequestData) (string, error) {
+	var builder strings.Builder
+	err := resolutionNoteTemplate.Execute(&builder, struct {
+		Resolution    string
+		ResolveReason string
+	}{
+		statusText(reqData.ResolutionTag),
+		reqData.ResolutionReason,
+	})
+	if err != nil {
+		return "", trace.Wrap(err)
+	}
+	return builder.String(), nil
+}
+
+func statusText(tag pd.ResolutionTag) string {
+	var statusEmoji string
+	status := string(tag)
+	switch tag {
+	case pd.Unresolved:
+		status = "PENDING"
+		statusEmoji = "⏳"
+	case pd.ResolvedApproved:
+		statusEmoji = "✅"
+	case pd.ResolvedDenied:
+		statusEmoji = "❌"
+	case pd.ResolvedExpired:
+		statusEmoji = "⌛"
+	}
+	return fmt.Sprintf("%s %s", statusEmoji, status)
 }

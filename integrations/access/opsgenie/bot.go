@@ -140,6 +140,7 @@ func createScheduleRecipient(ctx context.Context, name string) (*common.Recipien
 	}, nil
 }
 
+// FetchOncallUsers fetches on-call users filtered by the provided annotations.
 func (b Bot) FetchOncallUsers(ctx context.Context, reqData pd.AccessRequestData) ([]string, error) {
 	return nil, trace.NotImplemented("fetch oncall users not implemented for plugin")
 }

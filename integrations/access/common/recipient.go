@@ -30,8 +30,6 @@ const (
 	RecipientKindSchedule = "schedule"
 	// RecipientKindTeam shows a recipient is a team.
 	RecipientKindTeam = "team"
-	// RecipientKindService shows a recipient is a service.
-	RecipientKindService = "service"
 	// RecipientKindEmail shows a recipient is an email.
 	RecipientKindEmail = "email"
 )
