@@ -28,6 +28,7 @@ import "teleport/machineid/v1/bot_instance.proto";
 import "teleport/machineid/v1/federation.proto";
 import "teleport/notifications/v1/notifications.proto";
 import "teleport/secreports/v1/secreports.proto";
+import "teleport/userintegrationtasks/v1/user_integration_tasks.proto";
 import "teleport/userloginstate/v1/userloginstate.proto";
 import "teleport/userprovisioning/v1/statichostuser.proto";
 
@@ -177,5 +178,7 @@ message Event {
     teleport.machineid.v1.SPIFFEFederation SPIFFEFederation = 62;
     // StaticHostUser is a resource for static host users.
     teleport.userprovisioning.v1.StaticHostUser StaticHostUser = 63;
+    // UserIntegrationTask is a resource for user integration task.
+    teleport.userintegrationtasks.v1.UserIntegrationTask UserIntegrationTask = 64;
   }
 }
