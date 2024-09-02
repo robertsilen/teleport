@@ -19,6 +19,8 @@
 package userintegrationtasks
 
 import (
+	"slices"
+
 	"github.com/gravitational/trace"
 
 	headerv1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/header/v1"
@@ -50,7 +52,13 @@ const (
 	// when an auto-enrollment of an EC2 instance fails.
 	// UserIntegrationTasks that have this Task Type must include the DiscoverEC2 field.
 	TaskTypeDiscoverEC2 = "discover-ec2"
+	// IssueOpen identifies an issue with an instance that is not yet resolved.
+	IssueOpen = "OPEN"
+	// IssueResolved identifies an issue with an instance that is resolved.
+	IssueResolved = "RESOLVED"
 )
+
+var validIssueStates = []string{IssueOpen, IssueResolved}
 
 // ValidateUserIntegrationTask validates the UserIntegrationTask object without modifying it.
 func ValidateUserIntegrationTask(uit *userintegrationtasksv1.UserIntegrationTask) error {
@@ -91,6 +99,15 @@ func validateDiscoverEC2TaskType(uit *userintegrationtasksv1.UserIntegrationTask
 	}
 	if uit.Spec.IssueType == "" {
 		return trace.BadParameter("issue type is required")
+	}
+	for instanceName, instanceIssue := range uit.Spec.DiscoverEc2.Instances {
+		if instanceName == "" {
+			return trace.BadParameter("instance name in discover_ec2.instances field is required")
+		}
+		if !slices.Contains(validIssueStates, instanceIssue.State) {
+			return trace.BadParameter("instance state in discover_ec2.instances is invalid, allowed values: %v", validIssueStates)
+		}
+
 	}
 
 	return nil
