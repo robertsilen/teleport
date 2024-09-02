@@ -2536,6 +2536,7 @@ func (process *TeleportProcess) newAccessCacheForServices(cfg accesspoint.Config
 	cfg.StaticHostUsers = services.StaticHostUser
 	cfg.Trust = services.TrustInternal
 	cfg.UserGroups = services.UserGroups
+	cfg.UserIntegrationTasks = services.UserIntegrationTasks
 	cfg.UserLoginStates = services.UserLoginStates
 	cfg.Users = services.Identity
 	cfg.WebSession = services.Identity.WebSessions()
@@ -2565,6 +2566,7 @@ func (process *TeleportProcess) newAccessCacheForClient(cfg accesspoint.Config, 
 	cfg.DynamicAccess = client
 	cfg.Events = client
 	cfg.Integrations = client
+	cfg.UserIntegrationTasks = client.UserIntegrationTasksServiceClient()
 	cfg.KubeWaitingContainers = client
 	cfg.Kubernetes = client
 	cfg.Notifications = client
@@ -2647,6 +2649,7 @@ type combinedDiscoveryClient struct {
 	authclient.ClientI
 	discoveryConfigClient
 	eksClustersEnroller
+	services.UserIntegrationTasks
 }
 
 // newLocalCacheForDiscovery returns a new instance of access point for a discovery service.
@@ -2655,6 +2658,7 @@ func (process *TeleportProcess) newLocalCacheForDiscovery(clt authclient.ClientI
 		ClientI:               clt,
 		discoveryConfigClient: clt.DiscoveryConfigClient(),
 		eksClustersEnroller:   clt.IntegrationAWSOIDCClient(),
+		UserIntegrationTasks:  clt.UserIntegrationTasksServiceClient(),
 	}
 
 	// if caching is disabled, return access point
