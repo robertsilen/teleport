@@ -228,6 +228,9 @@ type InitConfig struct {
 	// Integrations is a service that manages Integrations.
 	Integrations services.Integrations
 
+	// UserIntegrationTasks is a service that manages UserIntegrationTasks.
+	UserIntegrationTasks services.UserIntegrationTasks
+
 	// DiscoveryConfigs is a service that manages DiscoveryConfigs.
 	DiscoveryConfigs services.DiscoveryConfigs
 

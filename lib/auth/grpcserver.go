@@ -65,6 +65,7 @@ import (
 	oktapb "github.com/gravitational/teleport/api/gen/proto/go/teleport/okta/v1"
 	presencev1pb "github.com/gravitational/teleport/api/gen/proto/go/teleport/presence/v1"
 	trustpb "github.com/gravitational/teleport/api/gen/proto/go/teleport/trust/v1"
+	userintegrationtaskpb "github.com/gravitational/teleport/api/gen/proto/go/teleport/userintegrationtasks/v1"
 	userloginstatev1 "github.com/gravitational/teleport/api/gen/proto/go/teleport/userloginstate/v1"
 	userprovisioningpb "github.com/gravitational/teleport/api/gen/proto/go/teleport/userprovisioning/v1"
 	userspb "github.com/gravitational/teleport/api/gen/proto/go/teleport/users/v1"
@@ -92,6 +93,7 @@ import (
 	"github.com/gravitational/teleport/lib/auth/presence/presencev1"
 	statichostuserv1 "github.com/gravitational/teleport/lib/auth/statichostuser"
 	"github.com/gravitational/teleport/lib/auth/trust/trustv1"
+	"github.com/gravitational/teleport/lib/auth/userintegrationtasks/userintegrationtasksv1"
 	"github.com/gravitational/teleport/lib/auth/userloginstate"
 	"github.com/gravitational/teleport/lib/auth/userpreferences/userpreferencesv1"
 	"github.com/gravitational/teleport/lib/auth/users/usersv1"
@@ -5317,6 +5319,16 @@ func NewGRPCServer(cfg GRPCServerConfig) (*GRPCServer, error) {
 		return nil, trace.Wrap(err)
 	}
 	integrationpb.RegisterAWSOIDCServiceServer(server, integrationAWSOIDCServiceServer)
+
+	userIntegrationTask, err := userintegrationtasksv1.NewService(userintegrationtasksv1.ServiceConfig{
+		Authorizer: cfg.Authorizer,
+		Backend:    cfg.AuthServer.Services,
+		Cache:      cfg.AuthServer.Cache,
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	userintegrationtaskpb.RegisterUserIntegrationTaskServiceServer(server, userIntegrationTask)
 
 	discoveryConfig, err := discoveryconfigv1.NewService(discoveryconfigv1.ServiceConfig{
 		Authorizer: cfg.Authorizer,
