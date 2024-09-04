@@ -320,10 +320,14 @@ var noEnd = []byte{0}
 // RangeEnd returns end of the range for a given key.
 func RangeEnd(key Key) Key {
 	k := slices.Clone(key)
-	if len(key) >= 1 && key[len(key)-1] == "" {
+
+	switch {
+	case len(key) == 1 && key[0] == "":
+		k[0] = string(noEnd)
+	case len(key) > 1 && key[len(key)-1] == "":
 		next := nextKey([]byte(key[len(key)-2] + Separator))
 		k[len(k)-2] = string(next)
-	} else {
+	default:
 		next := nextKey([]byte(k[len(k)-1]))
 		k[len(k)-1] = string(next)
 	}

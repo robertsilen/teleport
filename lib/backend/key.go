@@ -149,6 +149,10 @@ func (k Key) Components() []string {
 }
 
 func (k Key) Compare(o Key) int {
+	if len(o) == 1 && o[0] == string(noEnd) {
+		return -1
+	}
+
 	n := min(len(k), len(o))
 	for i := 0; i < n; i++ {
 		compare := strings.Compare(k[i], o[i])
