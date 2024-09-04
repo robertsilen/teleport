@@ -1,5 +1,5 @@
-import { events } from 'web/packages/teleport/src/Audit/fixtures';
-import { makeEvent } from 'web/packages/teleport/src/services/audit/makeEvent';
+import { events } from 'teleport/src/Audit/fixtures';
+import { makeEvent } from 'teleport/src/services/audit/makeEvent';
 
 events.forEach(e => {
   console.log(makeEvent(e));
