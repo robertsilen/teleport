@@ -248,7 +248,7 @@ func ValidateAtomicWrite(condacts []ConditionalAction) error {
 
 		containsWrite = containsWrite || condacts[i].Action.IsWrite()
 
-		key := string(condacts[i].Key)
+		key := condacts[i].Key.String()
 
 		if _, ok := keys[key]; ok {
 			return trace.BadParameter("multiple conditional actions target key %q", key)

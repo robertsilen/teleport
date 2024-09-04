@@ -207,7 +207,7 @@ func newRecordFromDoc(doc *firestore.DocumentSnapshot) (*record, error) {
 		}
 
 		r = record{
-			Key:        br.Key,
+			Key:        []byte(br.Key.String()),
 			Value:      br.Value,
 			Timestamp:  br.Timestamp,
 			Expires:    br.Expires,
@@ -223,7 +223,7 @@ func newRecordFromDoc(doc *firestore.DocumentSnapshot) (*record, error) {
 				return nil, ConvertGRPCError(err)
 			}
 			r = record{
-				Key:       backend.Key(rl.Key),
+				Key:       []byte(rl.Key),
 				Value:     []byte(rl.Value),
 				Timestamp: rl.Timestamp,
 				Expires:   rl.Expires,
@@ -591,7 +591,7 @@ func (b *Backend) Get(ctx context.Context, key backend.Key) (*backend.Item, erro
 				return &bi, nil
 			}
 		}
-		return nil, trace.NotFound("the supplied key: %q does not exist", string(key))
+		return nil, trace.NotFound("the supplied key: %v does not exist", key)
 	}
 
 	bi := r.backendItem()
@@ -664,7 +664,7 @@ func (b *Backend) Delete(ctx context.Context, key backend.Key) error {
 	docRef := b.svc.Collection(b.CollectionName).Doc(b.keyToDocumentID(key))
 	if _, err := docRef.Delete(ctx, firestore.Exists); err != nil {
 		if status.Code(err) == codes.NotFound {
-			return trace.NotFound("key %s does not exist", string(key))
+			return trace.NotFound("key %v does not exist", key)
 		}
 
 		return ConvertGRPCError(err)
@@ -881,7 +881,7 @@ func (b *Backend) Clock() clockwork.Clock {
 func (b *Backend) keyToDocumentID(key backend.Key) string {
 	// URL-safe base64 will not have periods or forward slashes.
 	// This should satisfy the Firestore requirements.
-	return base64.URLEncoding.EncodeToString(key)
+	return base64.URLEncoding.EncodeToString([]byte(key.String()))
 }
 
 // RetryingAsyncFunctionRunner wraps a task target in retry logic

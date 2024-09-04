@@ -22,7 +22,6 @@ import (
 	"context"
 	"regexp"
 	"time"
-	"unicode/utf8"
 
 	"github.com/gravitational/trace"
 	"github.com/jonboulle/clockwork"
@@ -35,26 +34,22 @@ const errorMessage = "special characters are not allowed in resource names, plea
 // the path.
 var allowPattern = regexp.MustCompile(`^[0-9A-Za-z@_:.\-/+]*$`)
 
-// denyPattern matches some unallowed combinations
-var denyPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`//`),
-	regexp.MustCompile(`(^|/)\.\.?(/|$)`),
-}
-
 // isKeySafe checks if the passed in key conforms to whitelist
-func isKeySafe(s Key) bool {
-	return allowPattern.Match(s) && !denyPatternsMatch(s) && utf8.Valid(s)
-}
+func isKeySafe(key Key) bool {
+	for _, k := range key {
+		switch k {
+		case string(noEnd):
+			continue
+		case ".", "..", "":
+			return false
+		}
 
-// denyPatternsMatch checks if the passed in key conforms to the deny patterns.
-func denyPatternsMatch(s Key) bool {
-	for _, pattern := range denyPatterns {
-		if pattern.Match(s) {
-			return true
+		if !allowPattern.MatchString(k) {
+			return false
 		}
 	}
 
-	return false
+	return true
 }
 
 var _ Backend = (*Sanitizer)(nil)

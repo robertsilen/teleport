@@ -30,7 +30,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/google/go-cmp/cmp"
@@ -151,7 +150,7 @@ func (s *IdentityService) ListUsers(ctx context.Context, req *userspb.ListUsersR
 // the next user in the list while still allowing listing to operate
 // without missing any users.
 func nextUserToken(user types.User) string {
-	return backend.RangeEnd(backend.ExactKey(user.GetName())).String()[utf8.RuneLen(backend.Separator):]
+	return backend.RangeEnd(backend.ExactKey(user.GetName())).String()[len(backend.Separator):]
 }
 
 // streamUsersWithSecrets is a helper that converts a stream of backend items over the user key range into a stream
@@ -221,7 +220,7 @@ func (s *IdentityService) streamUsersWithSecrets(itemStream stream.Stream[backen
 // streamUsersWithoutSecrets is a helper that converts a stream of backend items over the user range into a stream of
 // user resources without any included secrets.
 func (s *IdentityService) streamUsersWithoutSecrets(itemStream stream.Stream[backend.Item]) stream.Stream[*types.UserV2] {
-	suffix := backend.Key(paramsPrefix)
+	suffix := backend.NewKey(paramsPrefix)
 	userStream := stream.FilterMap(itemStream, func(item backend.Item) (*types.UserV2, bool) {
 		if !item.Key.HasSuffix(suffix) {
 			return nil, false
@@ -251,7 +250,7 @@ func (s *IdentityService) GetUsers(ctx context.Context, withSecrets bool) ([]typ
 	}
 	var out []types.User
 	for _, item := range result.Items {
-		if !item.Key.HasSuffix(backend.Key(paramsPrefix)) {
+		if !item.Key.HasSuffix(backend.NewKey(paramsPrefix)) {
 			continue
 		}
 		u, err := services.UnmarshalUser(

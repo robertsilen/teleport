@@ -25,16 +25,15 @@ import (
 )
 
 func TestKey(t *testing.T) {
-
-	k1 := backend.Key("test")
+	k1 := backend.Key{"test"}
 	k2 := backend.NewKey("test")
 	k3 := backend.ExactKey("test")
 
-	assert.NotEqual(t, k1, k2)
+	assert.Equal(t, k1, k2)
 	assert.NotEqual(t, k2, k3)
 	assert.NotEqual(t, k1, k3)
 
-	assert.Equal(t, "test", k1.String())
+	assert.Equal(t, "/test", k1.String())
 	assert.Equal(t, "/test", k2.String())
 	assert.Equal(t, "/test/", k3.String())
 }
@@ -80,8 +79,8 @@ func TestKeyString(t *testing.T) {
 		},
 		{
 			name:     "noend key",
-			key:      backend.Key{0},
-			expected: "\x00",
+			key:      backend.Key{string([]byte{0})},
+			expected: "/\x00",
 		},
 	}
 
@@ -97,7 +96,7 @@ func TestKeyComponents(t *testing.T) {
 	tests := []struct {
 		name     string
 		key      backend.Key
-		expected [][]byte
+		expected []string
 	}{
 		{
 			name: "default value has zero components",
@@ -109,22 +108,22 @@ func TestKeyComponents(t *testing.T) {
 		{
 			name:     "empty exact key has empty component",
 			key:      backend.ExactKey(),
-			expected: [][]byte{{}},
+			expected: []string{""},
 		},
 		{
 			name:     "single value key has a component",
 			key:      backend.NewKey("alpha"),
-			expected: [][]byte{[]byte("alpha")},
+			expected: []string{"alpha"},
 		},
 		{
 			name:     "multiple components",
 			key:      backend.NewKey("foo", "bar", "baz"),
-			expected: [][]byte{[]byte("foo"), []byte("bar"), []byte("baz")},
+			expected: []string{"foo", "bar", "baz"},
 		},
 		{
 			name:     "key without separator",
-			key:      backend.Key("testing"),
-			expected: [][]byte{[]byte("testing")},
+			key:      backend.Key{"testing"},
+			expected: []string{"testing"},
 		},
 	}
 
@@ -153,14 +152,12 @@ func TestKeyScan(t *testing.T) {
 			expectedError: "invalid Key type bool",
 		},
 		{
-			name:        "empty string key",
-			scan:        "",
-			expectedKey: backend.Key{},
+			name: "empty string key",
+			scan: "",
 		},
 		{
-			name:        "empty byte slice key",
-			scan:        []byte{},
-			expectedKey: backend.Key{},
+			name: "empty byte slice key",
+			scan: []byte{},
 		},
 		{
 			name:        "populated string key",
@@ -241,6 +238,7 @@ func TestKeyHasSuffix(t *testing.T) {
 		})
 	}
 }
+
 func TestKeyHasPrefix(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -249,7 +247,7 @@ func TestKeyHasPrefix(t *testing.T) {
 		assertion assert.BoolAssertionFunc
 	}{
 		{
-			name:      "default key has no prexies",
+			name:      "default key has no prefixes",
 			prefix:    backend.NewKey("test"),
 			assertion: assert.False,
 		},
@@ -269,6 +267,12 @@ func TestKeyHasPrefix(t *testing.T) {
 			assertion: assert.True,
 		},
 		{
+			name:      "empty prefix",
+			key:       backend.NewKey("a", "b", "c"),
+			prefix:    backend.NewKey(""),
+			assertion: assert.True,
+		},
+		{
 			name:      "valid multi component prefix",
 			key:       backend.NewKey("a", "b", "c"),
 			prefix:    backend.NewKey("a", "b"),
@@ -285,6 +289,12 @@ func TestKeyHasPrefix(t *testing.T) {
 			key:       backend.NewKey("a", "b", "c"),
 			prefix:    backend.NewKey("a", "b", "c"),
 			assertion: assert.True,
+		},
+		{
+			name:      "single key",
+			key:       backend.NewKey("d"),
+			prefix:    backend.NewKey("a"),
+			assertion: assert.False,
 		},
 	}
 
@@ -327,7 +337,7 @@ func TestKeyTrimSuffix(t *testing.T) {
 			name:     "all trimmed on exact match",
 			key:      backend.NewKey("a", "b", "c"),
 			trim:     backend.NewKey("a", "b", "c"),
-			expected: backend.NewKey(),
+			expected: backend.Key{},
 		},
 		{
 			name:     "partial trim",
@@ -377,7 +387,7 @@ func TestKeyTrimPrefix(t *testing.T) {
 			name:     "all trimmed on exact match",
 			key:      backend.NewKey("a", "b", "c"),
 			trim:     backend.NewKey("a", "b", "c"),
-			expected: backend.NewKey(),
+			expected: backend.Key{},
 		},
 		{
 			name:     "partial trim",
@@ -465,6 +475,42 @@ func TestKeyCompare(t *testing.T) {
 		{
 			name:     "empty keys are equal",
 			expected: 0,
+		},
+		{
+			name:     "test prefix",
+			key:      backend.NewKey("123", "prefix", "c", "c1"),
+			other:    backend.NewKey("123", "prefix"),
+			expected: 1,
+		},
+		{
+			name:     "test prefix2",
+			key:      backend.NewKey("123", "prefix", "a"),
+			other:    backend.NewKey("123", "prefix"),
+			expected: 1,
+		},
+		{
+			name:     "test prefix3",
+			key:      backend.NewKey("123", "prefix", "a"),
+			other:    backend.NewKey("123", "prefiy"),
+			expected: -1,
+		},
+		{
+			name:     "inverse prefix",
+			key:      backend.NewKey("123", "prefix"),
+			other:    backend.NewKey("123", "prefix", "c", "c1"),
+			expected: -1,
+		},
+		{
+			name:     "inverse prefix2",
+			key:      backend.NewKey("123", "prefix"),
+			other:    backend.NewKey("123", "prefix", "a"),
+			expected: -1,
+		},
+		{
+			name:     "inverse prefix3",
+			key:      backend.NewKey("123", "prefiy"),
+			other:    backend.NewKey("123", "prefix", "a"),
+			expected: 1,
 		},
 	}
 	for _, test := range tests {

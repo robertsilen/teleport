@@ -18,20 +18,27 @@ package backend
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
+	"slices"
 	"strings"
 )
 
 // Key is the unique identifier for an [Item].
-type Key []byte
+type Key []string
 
 // Separator is used as a separator between key parts
-const Separator = '/'
+const Separator = "/"
 
 // NewKey joins parts into path separated by Separator,
 // makes sure path always starts with Separator ("/")
 func NewKey(parts ...string) Key {
-	return internalKey("", parts...)
+	return parts
+}
+
+// KeyFromString creates a Key from its textual representation.
+func KeyFromString(key string) Key {
+	return strings.Split(key, Separator)
 }
 
 // ExactKey is like Key, except a Separator is appended to the result
@@ -39,56 +46,129 @@ func NewKey(parts ...string) Key {
 // math child paths and not other paths that have the resulting path
 // as a prefix.
 func ExactKey(parts ...string) Key {
-	return append(NewKey(parts...), Separator)
-}
-
-func internalKey(internalPrefix string, parts ...string) Key {
-	return Key(strings.Join(append([]string{internalPrefix}, parts...), string(Separator)))
+	return append(NewKey(parts...), "")
 }
 
 // String returns the textual representation of the key with
 // each component concatenated together via the [Separator].
 func (k Key) String() string {
-	return string(k)
+	if len(k) == 0 {
+		return ""
+	}
+
+	return Separator + strings.Join(k, Separator)
 }
 
 // HasPrefix reports whether the key begins with prefix.
 func (k Key) HasPrefix(prefix Key) bool {
-	return bytes.HasPrefix(k, prefix)
+	if len(prefix) == 0 || (len(prefix) == 1 && prefix[0] == "") {
+		return true
+	}
+
+	n := min(len(k), len(prefix))
+
+	for i := 0; i < n; i++ {
+		if k[i] != prefix[i] {
+			return false
+		}
+	}
+
+	return len(prefix) <= len(k)
 }
 
 // TrimPrefix returns the key without the provided leading prefix string.
 // If the key doesn't start with prefix, it is returned unchanged.
 func (k Key) TrimPrefix(prefix Key) Key {
-	return bytes.TrimPrefix(k, prefix)
+	if len(k) == 0 {
+		return k
+	}
+
+	n := min(len(k), len(prefix))
+
+	lastIndex := -1
+	for i := 0; i < n; i++ {
+		if k[i] != prefix[i] {
+			break
+		}
+		lastIndex = i
+	}
+
+	switch lastIndex {
+	case len(k) - 1:
+		return Key{}
+	case -1:
+		return k
+	default:
+		return k[lastIndex+1:]
+	}
 }
 
 func (k Key) PrependPrefix(p Key) Key {
-	return append(p, k...)
+	return append(slices.Clone(p), slices.Clone(k)...)
 }
 
 // HasSuffix reports whether the key ends with suffix.
 func (k Key) HasSuffix(suffix Key) bool {
-	return bytes.HasSuffix(k, suffix)
+	for i, j := len(k)-1, len(suffix)-1; i >= 0 && j >= 0; i, j = i-1, j-1 {
+		if k[i] != suffix[j] && i == len(k)-1 {
+			return false
+		}
+	}
+
+	return len(suffix) <= len(k)
 }
 
 // TrimSuffix returns the key without the provided trailing suffix string.
 // If the key doesn't end with suffix, it is returned unchanged.
 func (k Key) TrimSuffix(suffix Key) Key {
-	return bytes.TrimSuffix(k, suffix)
-}
-
-func (k Key) Components() [][]byte {
 	if len(k) == 0 {
-		return nil
+		return k
 	}
 
-	sep := []byte{Separator}
-	return bytes.Split(bytes.TrimPrefix(k, sep), sep)
+	lastIndex := len(k)
+	for i, j := len(k)-1, len(suffix)-1; i >= 0 && j >= 0; i, j = i-1, j-1 {
+		if k[i] != suffix[j] && i == len(k)-1 {
+			break
+		}
+
+		lastIndex = i
+	}
+
+	switch lastIndex {
+	case 0:
+		return Key{}
+	case len(k):
+		return k
+	default:
+		return k[:lastIndex]
+	}
+}
+
+func (k Key) Components() []string {
+	return k
 }
 
 func (k Key) Compare(o Key) int {
-	return bytes.Compare(k, o)
+	n := min(len(k), len(o))
+	for i := 0; i < n; i++ {
+		compare := strings.Compare(k[i], o[i])
+		if compare != 0 {
+			return compare
+		}
+	}
+
+	switch len(k) {
+	case len(o):
+		return 0
+	case 0:
+		return -1
+	default:
+		if len(o) == 0 {
+			return 1
+		}
+
+		return cmp.Compare(len(k), len(o))
+	}
 }
 
 // Scan implement sql.Scanner, allowing a [Key] to
@@ -97,9 +177,20 @@ func (k Key) Compare(o Key) int {
 func (k *Key) Scan(scan any) error {
 	switch key := scan.(type) {
 	case []byte:
-		*k = bytes.Clone(key)
+		if len(key) == 0 {
+			return nil
+		}
+
+		raw := bytes.Clone(key)
+		split := strings.Split(string(raw), Separator)
+		*k = split[1:]
 	case string:
-		*k = []byte(strings.Clone(key))
+		if key == "" {
+			return nil
+		}
+
+		split := strings.Split(key, Separator)
+		*k = split[1:]
 	default:
 		return fmt.Errorf("invalid Key type %T", scan)
 	}

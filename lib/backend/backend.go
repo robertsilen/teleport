@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"time"
 
@@ -177,7 +178,7 @@ func StreamRange(ctx context.Context, bk Backend, startKey, endKey Key, pageSize
 		if len(rslt.Items) < pageSize {
 			startKey = nil
 		} else {
-			startKey = nextKey(rslt.Items[pageSize-1].Key)
+			startKey = RangeEnd(rslt.Items[pageSize-1].Key)
 		}
 		return rslt.Items, nil
 	})
@@ -300,7 +301,7 @@ const NoLimit = 0
 // nextKey returns the next possible key.
 // If used with a key prefix, this will return
 // the end of the range for that key prefix.
-func nextKey(key Key) Key {
+func nextKey(key []byte) []byte {
 	end := make([]byte, len(key))
 	copy(end, key)
 	for i := len(end) - 1; i >= 0; i-- {
@@ -314,11 +315,20 @@ func nextKey(key Key) Key {
 	return noEnd
 }
 
-var noEnd = Key{0}
+var noEnd = []byte{0}
 
-// RangeEnd returns end of the range for given key.
+// RangeEnd returns end of the range for a given key.
 func RangeEnd(key Key) Key {
-	return nextKey(key)
+	k := slices.Clone(key)
+	if len(key) >= 1 && key[len(key)-1] == "" {
+		next := nextKey([]byte(key[len(key)-2] + Separator))
+		k[len(k)-2] = string(next)
+	} else {
+		next := nextKey([]byte(k[len(k)-1]))
+		k[len(k)-1] = string(next)
+	}
+
+	return k
 }
 
 // HostID is a derivation of a KeyedItem that allows the host id
@@ -338,7 +348,7 @@ type KeyedItem interface {
 // have the HostID part.
 func NextPaginationKey(ki KeyedItem) string {
 	key := GetPaginationKey(ki)
-	return string(nextKey(Key(key)))
+	return string(nextKey([]byte(key)))
 }
 
 // GetPaginationKey returns the pagination key given item.
@@ -346,7 +356,7 @@ func NextPaginationKey(ki KeyedItem) string {
 // have the HostID part.
 func GetPaginationKey(ki KeyedItem) string {
 	if h, ok := ki.(HostID); ok {
-		return string(internalKey(h.GetHostID(), h.GetName()))
+		return NewKey(h.GetHostID(), h.GetName()).String()
 	}
 
 	return ki.GetName()

@@ -270,7 +270,7 @@ func (c *UnifiedResourceCache) getRange(ctx context.Context, startKey backend.Ke
 func getStartKey(req *proto.ListUnifiedResourcesRequest) backend.Key {
 	// if startkey exists, return it
 	if req.StartKey != "" {
-		return backend.Key(req.StartKey)
+		return backend.KeyFromString(req.StartKey)
 	}
 	// if startkey doesnt exist, we check the sort direction.
 	// If sort is descending, startkey is end of the list

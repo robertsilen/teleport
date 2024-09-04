@@ -132,8 +132,8 @@ func (s *Reporter) GetRange(ctx context.Context, startKey, endKey Key, limit int
 		"backend/GetRange",
 		oteltrace.WithAttributes(
 			attribute.Int("limit", limit),
-			attribute.String("start_key", string(startKey)),
-			attribute.String("end_key", string(endKey)),
+			attribute.StringSlice("start_key", startKey),
+			attribute.StringSlice("end_key", endKey),
 		),
 	)
 	defer span.End()
@@ -151,7 +151,7 @@ func (s *Reporter) GetRange(ctx context.Context, startKey, endKey Key, limit int
 	end := s.Clock().Now()
 	if d := end.Sub(start); d > time.Second*3 {
 		if s.slowRangeLogLimiter.AllowN(end, 1) {
-			slog.WarnContext(ctx, "slow GetRange request", "start_key", string(startKey), "end_key", string(endKey), "limit", limit, "duration", logutils.StringerAttr(d))
+			slog.WarnContext(ctx, "slow GetRange request", "start_key", startKey, "end_key", endKey, "limit", limit, "duration", logutils.StringerAttr(d))
 		}
 	}
 	return res, err
@@ -164,7 +164,7 @@ func (s *Reporter) Create(ctx context.Context, i Item) (*Lease, error) {
 		"backend/Create",
 		oteltrace.WithAttributes(
 			attribute.String("revision", i.Revision),
-			attribute.String("key", string(i.Key)),
+			attribute.StringSlice("key", i.Key),
 		),
 	)
 	defer span.End()
@@ -193,7 +193,7 @@ func (s *Reporter) Put(ctx context.Context, i Item) (*Lease, error) {
 		"backend/Put",
 		oteltrace.WithAttributes(
 			attribute.String("revision", i.Revision),
-			attribute.String("key", string(i.Key)),
+			attribute.StringSlice("key", i.Key),
 		),
 	)
 	defer span.End()
@@ -218,7 +218,7 @@ func (s *Reporter) Update(ctx context.Context, i Item) (*Lease, error) {
 		"backend/Update",
 		oteltrace.WithAttributes(
 			attribute.String("revision", i.Revision),
-			attribute.String("key", string(i.Key)),
+			attribute.StringSlice("key", i.Key),
 		),
 	)
 	defer span.End()
@@ -246,7 +246,7 @@ func (s *Reporter) ConditionalUpdate(ctx context.Context, i Item) (*Lease, error
 		"backend/ConditionalUpdate",
 		oteltrace.WithAttributes(
 			attribute.String("revision", i.Revision),
-			attribute.String("key", string(i.Key)),
+			attribute.StringSlice("key", i.Key),
 		),
 	)
 	defer span.End()
@@ -273,7 +273,7 @@ func (s *Reporter) Get(ctx context.Context, key Key) (*Item, error) {
 		ctx,
 		"backend/Get",
 		oteltrace.WithAttributes(
-			attribute.String("key", string(key)),
+			attribute.StringSlice("key", key),
 		),
 	)
 	defer span.End()
@@ -297,7 +297,7 @@ func (s *Reporter) CompareAndSwap(ctx context.Context, expected Item, replaceWit
 		ctx,
 		"backend/CompareAndSwap",
 		oteltrace.WithAttributes(
-			attribute.String("key", string(expected.Key)),
+			attribute.StringSlice("key", expected.Key),
 		),
 	)
 	defer span.End()
@@ -324,7 +324,7 @@ func (s *Reporter) Delete(ctx context.Context, key Key) error {
 		ctx,
 		"backend/Delete",
 		oteltrace.WithAttributes(
-			attribute.String("key", string(key)),
+			attribute.StringSlice("key", key),
 		),
 	)
 	defer span.End()
@@ -352,7 +352,7 @@ func (s *Reporter) ConditionalDelete(ctx context.Context, key Key, revision stri
 		"backend/ConditionalDelete",
 		oteltrace.WithAttributes(
 			attribute.String("revision", revision),
-			attribute.String("key", string(key)),
+			attribute.StringSlice("key", key),
 		),
 	)
 	defer span.End()
@@ -432,8 +432,8 @@ func (s *Reporter) DeleteRange(ctx context.Context, startKey, endKey Key) error 
 		ctx,
 		"backend/DeleteRange",
 		oteltrace.WithAttributes(
-			attribute.String("start_key", string(startKey)),
-			attribute.String("end_key", string(endKey)),
+			attribute.StringSlice("start_key", startKey),
+			attribute.StringSlice("end_key", endKey),
 		),
 	)
 	defer span.End()
@@ -459,7 +459,7 @@ func (s *Reporter) KeepAlive(ctx context.Context, lease Lease, expires time.Time
 		"backend/KeepAlive",
 		oteltrace.WithAttributes(
 			attribute.String("revision", lease.Revision),
-			attribute.String("key", string(lease.Key)),
+			attribute.StringSlice("key", lease.Key),
 		),
 	)
 	defer span.End()
@@ -525,7 +525,7 @@ func (s *Reporter) trackRequest(opType types.OpType, key Key, endKey Key) {
 	if len(key) == 0 {
 		return
 	}
-	keyLabel := buildKeyLabel(string(key), sensitiveBackendPrefixes, singletonBackendPrefixes, len(endKey) != 0)
+	keyLabel := buildKeyLabel(key.String(), sensitiveBackendPrefixes, singletonBackendPrefixes, len(endKey) != 0)
 	rangeSuffix := teleport.TagFalse
 	if len(endKey) != 0 {
 		// Range denotes range queries in stat entry

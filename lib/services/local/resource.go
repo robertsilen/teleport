@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/gravitational/trace"
 
@@ -50,7 +49,7 @@ func CreateResources(ctx context.Context, b backend.Backend, resources ...types.
 			if err != nil {
 				return trace.Wrap(err)
 			}
-			return trace.AlreadyExists("resource %q already exists", string(item.Key))
+			return trace.AlreadyExists("resource %q already exists", item.Key)
 		}
 	}
 	// create all items.
@@ -443,7 +442,7 @@ func splitUsernameAndSuffix(key backend.Key) (name string, suffix string, err er
 	if len(components) < 2 {
 		return "", "", trace.BadParameter("expected format <name>/<suffix>, got %q", key)
 	}
-	return string(components[0]), k.String()[len(components[0])+utf8.RuneLen(backend.Separator):], nil
+	return string(components[0]), k.String()[len(components[0])+len(backend.Separator):], nil
 }
 
 // collectUserItems handles the case where multiple items pertain to the same user resource.

@@ -177,7 +177,7 @@ func TestReadLegacyRecord(t *testing.T) {
 	uut := newBackend(t, cfg)
 
 	item := backend.Item{
-		Key:     []byte("legacy-record"),
+		Key:     backend.NewKey("legacy-record"),
 		Value:   []byte("foo"),
 		Expires: uut.clock.Now().Add(time.Minute).Round(time.Second).UTC(),
 	}
@@ -186,7 +186,7 @@ func TestReadLegacyRecord(t *testing.T) {
 	// version of this backend.
 	ctx := context.Background()
 	rl := legacyRecord{
-		Key:       string(item.Key),
+		Key:       item.Key.String(),
 		Value:     string(item.Value),
 		Expires:   item.Expires.UTC().Unix(),
 		Timestamp: uut.clock.Now().UTC().Unix(),

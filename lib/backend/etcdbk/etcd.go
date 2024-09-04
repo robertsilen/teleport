@@ -675,7 +675,7 @@ func (b *EtcdBackend) GetRange(ctx context.Context, startKey, endKey backend.Key
 			return nil, trace.Wrap(err)
 		}
 		items = append(items, backend.Item{
-			Key:      b.trimPrefix(kv.Key),
+			Key:      b.trimPrefix(backend.KeyFromString(string(kv.Key))),
 			Value:    value,
 			Revision: toBackendRevision(kv.ModRevision),
 		})
@@ -718,7 +718,7 @@ func (b *EtcdBackend) Create(ctx context.Context, item backend.Item) (*backend.L
 		return nil, trace.Wrap(convertErr(err))
 	}
 	if !re.Succeeded {
-		return nil, trace.AlreadyExists("%q already exists", string(item.Key))
+		return nil, trace.AlreadyExists("%v already exists", item.Key)
 	}
 
 	lease.Revision = toBackendRevision(re.Header.Revision)
@@ -746,7 +746,7 @@ func (b *EtcdBackend) Update(ctx context.Context, item backend.Item) (*backend.L
 		return nil, trace.Wrap(convertErr(err))
 	}
 	if !re.Succeeded {
-		return nil, trace.NotFound("%q is not found", string(item.Key))
+		return nil, trace.NotFound("%v is not found", item.Key)
 	}
 
 	lease.Revision = toBackendRevision(re.Header.Revision)
@@ -824,7 +824,7 @@ func (b *EtcdBackend) CompareAndSwap(ctx context.Context, expected backend.Item,
 		return nil, trace.Wrap(err)
 	}
 	if !re.Succeeded {
-		return nil, trace.CompareFailed("key %q did not match expected value", string(expected.Key))
+		return nil, trace.CompareFailed("key %v did not match expected value", expected.Key)
 	}
 
 	lease.Revision = toBackendRevision(re.Header.Revision)
@@ -870,7 +870,7 @@ func (b *EtcdBackend) KeepAlive(ctx context.Context, lease backend.Lease, expire
 	_, err := b.clients.Next().Put(ctx, b.prependPrefix(lease.Key), "", opts...)
 	err = convertErr(err)
 	if trace.IsNotFound(err) {
-		return trace.NotFound("item %q is not found", string(lease.Key))
+		return trace.NotFound("item %q is not found", lease.Key)
 	}
 
 	return err
@@ -883,7 +883,7 @@ func (b *EtcdBackend) Get(ctx context.Context, key backend.Key) (*backend.Item, 
 		return nil, convertErr(err)
 	}
 	if len(re.Kvs) == 0 {
-		return nil, trace.NotFound("item %q is not found", string(key))
+		return nil, trace.NotFound("item %v is not found", key)
 	}
 	kv := re.Kvs[0]
 	value, err := unmarshal(kv.Value)
@@ -1009,7 +1009,7 @@ func (b *EtcdBackend) fromEvent(ctx context.Context, e clientv3.Event) (*backend
 	event := &backend.Event{
 		Type: fromType(e.Type),
 		Item: backend.Item{
-			Key:      b.trimPrefix(e.Kv.Key),
+			Key:      b.trimPrefix(backend.KeyFromString(string(e.Kv.Key))),
 			Revision: toBackendRevision(e.Kv.ModRevision),
 		},
 	}
@@ -1107,9 +1107,9 @@ func fromType(eventType mvccpb.Event_EventType) types.OpType {
 }
 
 func (b *EtcdBackend) trimPrefix(in backend.Key) backend.Key {
-	return in.TrimPrefix(backend.Key(b.cfg.Key))
+	return in.TrimPrefix(backend.KeyFromString(b.cfg.Key))
 }
 
 func (b *EtcdBackend) prependPrefix(in backend.Key) string {
-	return b.cfg.Key + string(in)
+	return in.PrependPrefix(backend.KeyFromString(b.cfg.Key)).String()
 }

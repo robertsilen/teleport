@@ -719,7 +719,7 @@ func (p *namespaceParser) match(key backend.Key) bool {
 	// namespaces are stored under key '/namespaces/<namespace-name>/params'
 	// and this code matches similar pattern
 	return p.baseParser.match(key) &&
-		key.HasSuffix(backend.Key(paramsPrefix)) &&
+		key.HasSuffix(backend.NewKey(paramsPrefix)) &&
 		len(key.Components()) == 3
 }
 
@@ -833,7 +833,7 @@ func (p *userParser) match(key backend.Key) bool {
 	// users are stored under key '/web/users/<username>/params'
 	// and this code matches similar pattern
 	return p.baseParser.match(key) &&
-		key.HasSuffix(backend.Key(paramsPrefix)) &&
+		key.HasSuffix(backend.NewKey(paramsPrefix)) &&
 		len(key.Components()) == 4
 }
 
@@ -2431,7 +2431,7 @@ type EventMatcher interface {
 func base(key backend.Key, offset int) (string, error) {
 	parts := key.Components()
 	if len(parts) < offset+1 {
-		return "", trace.NotFound("failed parsing %v", string(key))
+		return "", trace.NotFound("failed parsing %v", key)
 	}
 	return string(parts[len(parts)-offset-1]), nil
 }
@@ -2440,7 +2440,7 @@ func base(key backend.Key, offset int) (string, error) {
 func baseTwoKeys(key backend.Key) (string, string, error) {
 	parts := key.Components()
 	if len(parts) < 2 {
-		return "", "", trace.NotFound("failed parsing %v", string(key))
+		return "", "", trace.NotFound("failed parsing %v", key)
 	}
 	return string(parts[len(parts)-2]), string(parts[len(parts)-1]), nil
 }

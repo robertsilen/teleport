@@ -33,7 +33,7 @@ const (
 )
 
 func lockKey(parts ...string) Key {
-	return internalKey(locksPrefix, parts...)
+	return NewKey(append([]string{locksPrefix}, parts...)...)
 }
 
 type Lock struct {

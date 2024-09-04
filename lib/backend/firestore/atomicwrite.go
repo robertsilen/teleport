@@ -19,7 +19,6 @@
 package firestore
 
 import (
-	"bytes"
 	"context"
 
 	"cloud.google.com/go/firestore"
@@ -132,11 +131,11 @@ func (b *Backend) AtomicWrite(ctx context.Context, condacts []backend.Conditiona
 
 	if err != nil {
 		if status.Code(err) == codes.Aborted {
-			var keys [][]byte
+			var keys []backend.Key
 			for _, ca := range condacts {
 				keys = append(keys, ca.Key)
 			}
-			log.Errorf("AtomicWrite failed, firestore experienced too many txn rollbacks. keys=%s", bytes.Join(keys, []byte(",")))
+			log.Errorf("AtomicWrite failed, firestore experienced too many txn rollbacks. keys=%v", keys)
 			// RunTransaction does not officially document what error is returned if MaxAttempts is exceeded,
 			// but as currently implemented it should simply bubble up the Aborted error from the most recent
 			// failed commit attempt.

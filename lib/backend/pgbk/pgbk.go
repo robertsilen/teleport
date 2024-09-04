@@ -459,7 +459,7 @@ func (b *Backend) GetRange(ctx context.Context, startKey, endKey backend.Key, li
 					return backend.Item{}, err
 				}
 				return backend.Item{
-					Key:      key,
+					Key:      backend.KeyFromString(string(key)),
 					Value:    value,
 					Expires:  expires.UTC(),
 					Revision: revisionToString(revision),

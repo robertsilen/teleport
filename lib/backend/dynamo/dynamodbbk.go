@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -214,10 +213,6 @@ const (
 
 	// hashKeyKey is a name of the hash key
 	hashKeyKey = "HashKey"
-
-	// keyPrefix is a prefix that is added to every dynamodb key
-	// for backwards compatibility
-	keyPrefix = "teleport"
 )
 
 // GetName is a part of backend API and it returns DynamoDB backend type
@@ -996,15 +991,19 @@ const (
 	modeConditionalUpdate
 )
 
+// keyPrefix is a prefix that is added to every dynamodb key
+// for backwards compatibility
+var keyPrefix = backend.Key{"teleport"}
+
 // prependPrefix adds leading 'teleport/' to the key for backwards compatibility
 // with previous implementation of DynamoDB backend
 func prependPrefix(key backend.Key) string {
-	return keyPrefix + string(key)
+	return key.PrependPrefix(keyPrefix).String()
 }
 
 // trimPrefix removes leading 'teleport' from the key
 func trimPrefix(key string) backend.Key {
-	return backend.Key(strings.TrimPrefix(key, keyPrefix))
+	return backend.KeyFromString(key).TrimPrefix(keyPrefix)
 }
 
 // create is a helper that writes a key/value pair in Dynamo with a given expiration.
@@ -1111,14 +1110,14 @@ func (b *Backend) getKey(ctx context.Context, key backend.Key) (*record, error) 
 	if err != nil {
 		// we deliberately use a "generic" trace error here, since we don't want
 		// callers to make assumptions about the nature of the failure.
-		return nil, trace.WrapWithMessage(err, "failed to get %q (dynamo error)", string(key))
+		return nil, trace.WrapWithMessage(err, "failed to get %v (dynamo error)", key)
 	}
 	if len(out.Item) == 0 {
-		return nil, trace.NotFound("%q is not found", string(key))
+		return nil, trace.NotFound("%v is not found", key)
 	}
 	var r record
 	if err := attributevalue.UnmarshalMap(out.Item, &r); err != nil {
-		return nil, trace.WrapWithMessage(err, "failed to unmarshal dynamo item %q", string(key))
+		return nil, trace.WrapWithMessage(err, "failed to unmarshal dynamo item %v", key)
 	}
 	// Check if key expired, if expired delete it
 	if r.isExpired(b.clock.Now()) {
