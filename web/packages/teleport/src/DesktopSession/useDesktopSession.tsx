@@ -42,15 +42,6 @@ export default function useDesktopSession() {
   const { attempt: tdpConnection, setAttempt: setTdpConnection } =
     useAttempt('processing');
 
-  // wsConnection track's the state of the tdpClient's websocket connection.
-  // - 'init' to start
-  // - 'open' when TdpClientEvent.WS_OPEN is encountered
-  // - then 'closed' again when TdpClientEvent.WS_CLOSE is encountered.
-  // Once it's 'closed', it should have the message that came with the TdpClientEvent.WS_CLOSE event..
-  const [wsConnection, setWsConnection] = useState<WebsocketAttempt>({
-    status: 'init',
-  });
-
   const { username, desktopName, clusterId } = useParams<UrlDesktopParams>();
 
   const [hostname, setHostname] = useState<string>('');
@@ -122,7 +113,6 @@ export default function useDesktopSession() {
     desktopName,
     clusterId,
     setTdpConnection,
-    setWsConnection,
     setClipboardSharingState,
     setDirectorySharingState,
     clipboardSharingState,
@@ -204,7 +194,6 @@ export default function useDesktopSession() {
     setDirectorySharingState,
     fetchAttempt,
     tdpConnection,
-    wsConnection,
     webauthn,
     setTdpConnection,
     showAnotherSessionActiveDialog,
@@ -380,9 +369,4 @@ export const defaultDirectorySharingState: DirectorySharingState = {
 
 export const defaultClipboardSharingState: ClipboardSharingState = {
   browserSupported: navigator.userAgent.includes('Chrome'),
-};
-
-export type WebsocketAttempt = {
-  status: 'init' | 'open' | 'closed';
-  statusText?: string;
 };

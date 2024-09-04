@@ -38,7 +38,7 @@ import useDesktopSession, {
 } from './useDesktopSession';
 import TopBar from './TopBar';
 
-import type { State, WebsocketAttempt } from './useDesktopSession';
+import type { State } from './useDesktopSession';
 import type { WebAuthnState } from 'teleport/lib/useWebAuthn';
 
 export function DesktopSessionContainer() {
@@ -67,8 +67,6 @@ export function DesktopSession(props: State) {
     clientOnTdpError,
     clientOnTdpWarning,
     clientOnTdpInfo,
-    clientOnWsClose,
-    clientOnWsOpen,
     canvasOnKeyDown,
     canvasOnKeyUp,
     canvasOnFocusOut,
@@ -87,7 +85,6 @@ export function DesktopSession(props: State) {
     onRemoveAlert,
     fetchAttempt,
     tdpConnection,
-    wsConnection,
     showAnotherSessionActiveDialog,
   } = props;
 
@@ -103,18 +100,11 @@ export function DesktopSession(props: State) {
         prevState,
         fetchAttempt,
         tdpConnection,
-        wsConnection,
         showAnotherSessionActiveDialog,
         webauthn
       )
     );
-  }, [
-    fetchAttempt,
-    tdpConnection,
-    wsConnection,
-    showAnotherSessionActiveDialog,
-    webauthn,
-  ]);
+  }, [fetchAttempt, tdpConnection, showAnotherSessionActiveDialog, webauthn]);
 
   return (
     <Flex flexDirection="column">
@@ -164,8 +154,6 @@ export function DesktopSession(props: State) {
         clientOnTdpError={clientOnTdpError}
         clientOnTdpWarning={clientOnTdpWarning}
         clientOnTdpInfo={clientOnTdpInfo}
-        clientOnWsClose={clientOnWsClose}
-        clientOnWsOpen={clientOnWsOpen}
         canvasOnKeyDown={canvasOnKeyDown}
         canvasOnKeyUp={canvasOnKeyUp}
         canvasOnFocusOut={canvasOnFocusOut}
@@ -280,7 +268,6 @@ const nextScreenState = (
   prevState: ScreenState,
   fetchAttempt: Attempt,
   tdpConnection: Attempt,
-  wsConnection: WebsocketAttempt,
   showAnotherSessionActiveDialog: boolean,
   webauthn: WebAuthnState
 ): ScreenState => {
@@ -300,11 +287,10 @@ const nextScreenState = (
   // Otherwise, calculate a new screen state.
   const showAnotherSessionActive = showAnotherSessionActiveDialog;
   const showMfa = webauthn.requested;
-  const showAlert =
+  const showAlert = // TODO(zmb3) handle websocket closed
     fetchAttempt.status === 'failed' || // Fetch attempt failed
     tdpConnection.status === 'failed' || // TDP connection failed
-    tdpConnection.status === '' || // TDP connection ended gracefully server-side
-    wsConnection.status === 'closed'; // Websocket closed (could mean client side graceful close or unexpected close, the message will tell us which)
+    tdpConnection.status === '';
 
   const atLeastOneAttemptProcessing =
     fetchAttempt.status === 'processing' ||
@@ -336,7 +322,6 @@ const nextScreenState = (
       alertMessage: calculateAlertMessage(
         fetchAttempt,
         tdpConnection,
-        wsConnection,
         showAnotherSessionActiveDialog,
         prevState
       ),
@@ -366,7 +351,6 @@ const nextScreenState = (
 const calculateAlertMessage = (
   fetchAttempt: Attempt,
   tdpConnection: Attempt,
-  wsConnection: WebsocketAttempt,
   showAnotherSessionActiveDialog: boolean,
   prevState: ScreenState
 ): string => {
@@ -377,15 +361,11 @@ const calculateAlertMessage = (
     message = tdpConnection.statusText || 'TDP connection failed';
   } else if (tdpConnection.status === '') {
     message = tdpConnection.statusText || 'TDP connection ended gracefully';
-  } else if (wsConnection.status === 'closed') {
-    message =
-      wsConnection.statusText || 'websocket disconnected for an unknown reason';
   } else {
     console.error('invalid state');
     console.error({
       fetchAttempt,
       tdpConnection,
-      wsConnection,
       showAnotherSessionActiveDialog,
       prevState,
     });
@@ -397,11 +377,11 @@ const calculateAlertMessage = (
 
 type ScreenState = {
   screen:
-    | 'mfa'
-    | 'anotherSessionActive'
-    | 'alert dialog'
-    | 'processing'
-    | 'canvas';
+    | 'mfa' // tell the user they are about to be prompted for per-session MFA
+    | 'anotherSessionActive' // show a dialog explaining that this desktop may have an active session
+    | 'alert dialog' // show the "Disconnected" dialog
+    | 'processing' // show a loading spinner
+    | 'canvas'; // show the remote desktop session during normal operation
 
   alertMessage?: string;
   canvasState: {

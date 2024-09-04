@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 /**
  * Teleport
  * Copyright (C) 2023  Gravitational, Inc.
@@ -58,7 +57,6 @@ export default function useTdpClientCanvas(props: Props) {
     desktopName,
     clusterId,
     setTdpConnection,
-    setWsConnection,
     clipboardSharingState,
     setClipboardSharingState,
     setDirectorySharingState,
@@ -97,12 +95,8 @@ export default function useTdpClientCanvas(props: Props) {
     const { width, height } = spec;
     canvas.width = width;
     canvas.height = height;
-    console.debug(`set canvas.width x canvas.height to ${width} x ${height}`);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
-    console.debug(
-      `set canvas.style.width x canvas.style.height to ${width} x ${height}`
-    );
   };
 
   // Default TdpClientEvent.TDP_PNG_FRAME handler (buffered)
@@ -195,14 +189,6 @@ export default function useTdpClientCanvas(props: Props) {
       status: '', // gracefully disconnecting
       statusText: info,
     });
-  };
-
-  const clientOnWsClose = (statusText: string) => {
-    setWsConnection({ status: 'closed', statusText });
-  };
-
-  const clientOnWsOpen = () => {
-    setWsConnection({ status: 'open' });
   };
 
   const canvasOnKeyDown = (cli: TdpClient, e: KeyboardEvent) => {
@@ -314,8 +300,6 @@ export default function useTdpClientCanvas(props: Props) {
     clientOnClientScreenSpec,
     clientOnTdpError,
     clientOnClipboardData,
-    clientOnWsClose,
-    clientOnWsOpen,
     clientOnTdpWarning,
     clientOnTdpInfo,
     canvasOnKeyDown,
@@ -345,7 +329,6 @@ type Props = {
   desktopName: string;
   clusterId: string;
   setTdpConnection: Setter<Attempt>;
-  setWsConnection: Setter<{ status: 'open' | 'closed'; statusText?: string }>;
   clipboardSharingState: ClipboardSharingState;
   setClipboardSharingState: Setter<ClipboardSharingState>;
   setDirectorySharingState: Setter<DirectorySharingState>;

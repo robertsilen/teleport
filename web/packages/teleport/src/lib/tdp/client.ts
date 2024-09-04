@@ -581,7 +581,7 @@ export default class Client extends EventEmitterWebAuthnSender {
   protected send(
     data: string | ArrayBufferLike | Blob | ArrayBufferView
   ): void {
-    if (this.socket && this.socket.readyState === 1) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       try {
         this.socket.send(data);
       } catch (e) {
