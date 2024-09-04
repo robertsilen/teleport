@@ -1,0 +1,9 @@
+{
+  "name": "gen-audit-event-reference",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {},
+  "packageManager": "pnpm@9.8.0"
+}
