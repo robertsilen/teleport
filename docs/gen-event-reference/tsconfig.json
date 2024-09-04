@@ -24,15 +24,5 @@
       "teleport": ["../../web/packages/teleport/src/"]
     }
   },
-  "include": [
-    "../../web/packages/teleport/src/**/*.tsx"
-  ],
-  "exclude": [
-    "../../node_modules",
-    "**/node_modules/*",
-    "../../dist",
-    "**/dist/*",
-    "**/build/app/**",
-    "**/build/release/**"
-  ]
+  "references": [{ "path": "../../tsconfig.json" }]
 }
