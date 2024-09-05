@@ -14,7 +14,7 @@ export default defineConfig(() => ({
   build: {
     lib: {
       name: 'event-fixtures',
-      entry: path.resolve(__dirname, 'src/Audit/fixtures/index.ts'),
+      entry: path.resolve(__dirname, '../../web/packages/teleport/src/Audit/fixtures/index.ts'),
       fileName: 'event-fixtures',
       formats: ['es' as const],
     },
