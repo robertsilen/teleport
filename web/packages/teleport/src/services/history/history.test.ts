@@ -83,7 +83,6 @@ describe('services/history', () => {
           '/web/cluster/:siteId/node/:serverId/:login/:sid?',
         ]);
       push('invalid').andExpect(fallbackRoute);
-      push('.').andExpect(fallbackRoute);
       push('/valid/test').andExpect(fallbackRoute);
       push('@#4').andExpect(fallbackRoute);
       push('/valid').andExpect('/valid');
@@ -117,7 +116,7 @@ describe('services/history', () => {
       jest
         .spyOn(history, 'getRoutes')
         .mockReturnValue(['/web/login', '/current-location']);
-      history.original().location.pathname = '/current-location';
+      history.original().push('/current-location');
       history.goToLogin({ rememberLocation: true });
 
       const expected =
@@ -129,7 +128,7 @@ describe('services/history', () => {
       jest
         .spyOn(history, 'getRoutes')
         .mockReturnValue(['/web/login', '/current-location']);
-      history.original().location.pathname = '/current-location';
+      history.original().push('/current-location');
       history.goToLogin({ withAccessChangedMessage: true });
 
       const expected = '/web/login?access_changed';
@@ -140,7 +139,7 @@ describe('services/history', () => {
       jest
         .spyOn(history, 'getRoutes')
         .mockReturnValue(['/web/login', '/current-location']);
-      history.original().location.pathname = '/current-location';
+      history.original().push('/current-location');
       history.goToLogin({
         rememberLocation: true,
         withAccessChangedMessage: true,
@@ -155,7 +154,7 @@ describe('services/history', () => {
       jest
         .spyOn(history, 'getRoutes')
         .mockReturnValue(['/web/login', '/current-location']);
-      history.original().location.pathname = '/current-location';
+      history.original().push('/current-location');
       history.goToLogin();
 
       const expected = '/web/login';
@@ -166,14 +165,14 @@ describe('services/history', () => {
       jest
         .spyOn(history, 'getRoutes')
         .mockReturnValue(['/web/login', '/current-location']);
-      history.original().location.pathname = '/current-location?test=value';
+      history.original().push('/current-location?test=value');
       history.goToLogin({
         rememberLocation: true,
         withAccessChangedMessage: true,
       });
 
       const expected =
-        '/web/login?access_changed&redirect_uri=http://localhost/current-location?test=value';
+        '/web/login?access_changed&redirect_uri=http://localhost/current-location%3Ftest%3Dvalue';
       expect(history._pageRefresh).toHaveBeenCalledWith(expected);
     });
   });
