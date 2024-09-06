@@ -21,10 +21,12 @@ import { useParams } from 'react-router';
 
 import useAttempt from 'shared/hooks/useAttemptNext';
 
-import { ButtonState } from 'teleport/lib/tdp';
+import { ButtonState, TdpClient } from 'teleport/lib/tdp';
 import useWebAuthn from 'teleport/lib/useWebAuthn';
 import desktopService from 'teleport/services/desktops';
 import userService from 'teleport/services/user';
+import { getHostName } from 'teleport/services/api';
+import cfg from 'teleport/config';
 
 import useTdpClientCanvas from './useTdpClientCanvas';
 
@@ -34,13 +36,14 @@ import type { NotificationItem } from 'shared/components/Notification';
 export default function useDesktopSession() {
   const { attempt: fetchAttempt, run } = useAttempt('processing');
 
-  // tdpConnection tracks the state of the tdpClient's TDP connection
-  // - 'processing' at first
-  // - 'success' once the first TdpClientEvent.IMAGE_FRAGMENT is seen
-  // - 'failed' if a fatal error is encountered, should have a statusText
-  // - '' if the connection closed gracefully by the server, should have a statusText
-  const { attempt: tdpConnection, setAttempt: setTdpConnection } =
-    useAttempt('processing');
+  // // tdpConnection tracks the state of the tdpClient's TDP connection
+  // // - 'processing' at first
+  // // - 'success' once the first TdpClientEvent.IMAGE_FRAGMENT is seen
+  // // - 'failed' if a fatal error is encountered, should have a statusText
+  // // - '' if the connection closed gracefully by the server, should have a statusText
+  // const { attempt: tdpConnection, setAttempt: setTdpConnection } =
+  //   useAttempt('processing');
+  const [tdpClient, setTdpClient] = useState<TdpClient>(null);
 
   const { username, desktopName, clusterId } = useParams<UrlDesktopParams>();
 
@@ -108,17 +111,25 @@ export default function useDesktopSession() {
     setAlerts(prevState => prevState.filter(alert => alert.id !== id));
   };
 
-  const clientCanvasProps = useTdpClientCanvas({
-    username,
-    desktopName,
-    clusterId,
-    setTdpConnection,
-    setClipboardSharingState,
-    setDirectorySharingState,
-    clipboardSharingState,
-    setAlerts,
-  });
-  const tdpClient = clientCanvasProps.tdpClient;
+  const addr = cfg.api.desktopWsAddr
+    .replace(':fqdn', getHostName())
+    .replace(':clusterId', clusterId)
+    .replace(':desktopName', desktopName)
+    .replace(':username', username);
+
+  setTdpClient(new TdpClient(addr));
+
+  // const clientCanvasProps = useTdpClientCanvas({
+  //   username,
+  //   desktopName,
+  //   clusterId,
+  //   setTdpConnection,
+  //   setClipboardSharingState,
+  //   setDirectorySharingState,
+  //   clipboardSharingState,
+  //   setAlerts,
+  // });
+  // const tdpClient = clientCanvasProps.tdpClient;
 
   const webauthn = useWebAuthn(tdpClient);
 
@@ -193,9 +204,9 @@ export default function useDesktopSession() {
     directorySharingState,
     setDirectorySharingState,
     fetchAttempt,
-    tdpConnection,
+    // tdpConnection,
     webauthn,
-    setTdpConnection,
+    // setTdpConnection,
     showAnotherSessionActiveDialog,
     setShowAnotherSessionActiveDialog,
     onShareDirectory,
