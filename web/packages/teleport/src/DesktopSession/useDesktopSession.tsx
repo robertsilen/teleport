@@ -16,7 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { useEffect, useState, useMemo, Dispatch, SetStateAction } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  Dispatch,
+  SetStateAction,
+} from 'react';
 import { useParams } from 'react-router';
 
 import useAttempt from 'shared/hooks/useAttemptNext';
@@ -26,6 +33,8 @@ import useWebAuthn from 'teleport/lib/useWebAuthn';
 import desktopService from 'teleport/services/desktops';
 import userService from 'teleport/services/user';
 import { getHostName } from 'teleport/services/api';
+import { ClipboardData } from 'teleport/lib/tdp/codec';
+import { Sha256Digest } from 'teleport/lib/util';
 import cfg from 'teleport/config';
 
 import useTdpClientCanvas from './useTdpClientCanvas';
@@ -35,6 +44,9 @@ import type { NotificationItem } from 'shared/components/Notification';
 
 export default function useDesktopSession() {
   const { attempt: fetchAttempt, run } = useAttempt('processing');
+  const latestClipboardDigest = useRef('');
+  const encoder = useRef(new TextEncoder());
+  const clientCanvasProps = useTdpClientCanvas();
 
   // // tdpConnection tracks the state of the tdpClient's TDP connection
   // // - 'processing' at first
@@ -117,19 +129,66 @@ export default function useDesktopSession() {
     .replace(':desktopName', desktopName)
     .replace(':username', username);
 
-  setTdpClient(new TdpClient(addr));
+  // Default TdpClientEvent.TDP_CLIPBOARD_DATA handler.
+  const onClipboardData = async (clipboardData: ClipboardData) => {
+    if (
+      clipboardData.data &&
+      (await sysClipboardGuard(clipboardSharingState, 'write'))
+    ) {
+      navigator.clipboard.writeText(clipboardData.data);
+      let digest = await Sha256Digest(clipboardData.data, encoder.current);
+      latestClipboardDigest.current = digest;
+    }
+  };
 
-  // const clientCanvasProps = useTdpClientCanvas({
-  //   username,
-  //   desktopName,
-  //   clusterId,
-  //   setTdpConnection,
-  //   setClipboardSharingState,
-  //   setDirectorySharingState,
-  //   clipboardSharingState,
-  //   setAlerts,
-  // });
-  // const tdpClient = clientCanvasProps.tdpClient;
+  // Default TdpClientEvent.TDP_ERROR and TdpClientEvent.CLIENT_ERROR handler
+  const onError = (error: Error) => {
+    setDirectorySharingState(defaultDirectorySharingState);
+    setClipboardSharingState(defaultClipboardSharingState);
+    // should merge this + wsStatus into 1 connection var
+    // setTdpConnection(prevState => {
+    //   // Sometimes when a connection closes due to an error, we get a cascade of
+    //   // errors. Here we update the status only if it's not already 'failed', so
+    //   // that the first error message (which is usually the most informative) is
+    //   // displayed to the user.
+    //   if (prevState.status !== 'failed') {
+    //     return {
+    //       status: 'failed',
+    //       statusText: error.message || error.toString(),
+    //     };
+    //   }
+    //   return prevState;
+    // });
+  };
+
+  // Default TdpClientEvent.TDP_WARNING and TdpClientEvent.CLIENT_WARNING handler
+  const onWarning = (warning: string) => {
+    setAlerts(prevState => {
+      return [
+        ...prevState,
+        {
+          content: warning,
+          severity: 'warn',
+          id: crypto.randomUUID(),
+        },
+      ];
+    });
+  };
+
+  // TODO(zmb3): this is not what an info-level alert should do.
+  // rename it to something like onGracefulDisconnect
+  const onInfo = (info: string) => {
+    setDirectorySharingState(defaultDirectorySharingState);
+    setClipboardSharingState(defaultClipboardSharingState);
+    // setTdpConnection({
+    //   status: '', // gracefully disconnecting
+    //   statusText: info,
+    // });
+  };
+
+  setTdpClient(
+    new TdpClient(addr, { onClipboardData, onError, onWarning, onInfo })
+  );
 
   const webauthn = useWebAuthn(tdpClient);
 
@@ -213,6 +272,8 @@ export default function useDesktopSession() {
     onCtrlAltDel,
     alerts,
     onRemoveAlert,
+    // this shouldn't be spread, but passed as its own object and
+    // _then_ spread as props into `TdpCanvas`
     ...clientCanvasProps,
   };
 }
@@ -381,3 +442,36 @@ export const defaultDirectorySharingState: DirectorySharingState = {
 export const defaultClipboardSharingState: ClipboardSharingState = {
   browserSupported: navigator.userAgent.includes('Chrome'),
 };
+
+/**
+ * To be called before any system clipboard read/write operation.
+ */
+function sysClipboardGuard(
+  clipboardSharingState: ClipboardSharingState,
+  checkingFor: 'read' | 'write'
+): boolean {
+  // If we're not allowed to share the clipboard according to the acl
+  // or due to the browser we're using, never try to read or write.
+  if (!clipboardSharingPossible(clipboardSharingState)) {
+    return false;
+  }
+
+  // If the relevant state is 'prompt', try the operation so that the
+  // user is prompted to allow it.
+  const checkingForRead = checkingFor === 'read';
+  const checkingForWrite = checkingFor === 'write';
+  const relevantStateIsPrompt =
+    (checkingForRead && clipboardSharingState.readState === 'prompt') ||
+    (checkingForWrite && clipboardSharingState.writeState === 'prompt');
+  if (relevantStateIsPrompt) {
+    return true;
+  }
+
+  // Otherwise try only if both read and write permissions are granted
+  // and the document has focus (without focus we get an uncatchable error).
+  //
+  // Note that there's no situation where only one of read or write is granted,
+  // but the other is denied, and we want to try the operation. The feature is
+  // either fully enabled or fully disabled.
+  return isSharingClipboard(clipboardSharingState) && document.hasFocus();
+}

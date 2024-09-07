@@ -27,8 +27,6 @@ import {
   ClipboardData,
   PngFrame,
 } from 'teleport/lib/tdp/codec';
-import { getHostName } from 'teleport/services/api';
-import cfg from 'teleport/config';
 import { Sha256Digest } from 'teleport/lib/util';
 
 import { TopBarHeight } from './TopBar';
@@ -51,21 +49,23 @@ declare global {
   }
 }
 
-export default function useTdpClientCanvas(props: Props) {
-  const {
-    username,
-    desktopName,
-    clusterId,
-    setTdpConnection,
-    clipboardSharingState,
-    setClipboardSharingState,
-    setDirectorySharingState,
-    setAlerts,
-  } = props;
-  const [tdpClient, setTdpClient] = useState<TdpClient | null>(null);
+export default function useTdpClientCanvas() {
+  // const {
+  //   username,
+  //   desktopName,
+  //   clusterId,
+  //   setTdpConnection,
+  //   clipboardSharingState,
+  //   setClipboardSharingState,
+  //   setDirectorySharingState,
+  //   setAlerts,
+  // } = props;
+
+  // this should be moved into part of wsStatus probably.
+  // really, the only thing its doing is tracking when we've received
+  // the first frame to know "hey im connected", but perhaps we should
+  // rename it/move it to better track what we are trying to do
   const initialTdpConnectionSucceeded = useRef(false);
-  const encoder = useRef(new TextEncoder());
-  const latestClipboardDigest = useRef('');
   const keyboardHandler = useRef(new KeyboardHandler());
 
   useEffect(() => {
@@ -76,16 +76,6 @@ export default function useTdpClientCanvas(props: Props) {
       keyboardHandler.current.dispose();
     };
   }, []);
-
-  useEffect(() => {
-    const addr = cfg.api.desktopWsAddr
-      .replace(':fqdn', getHostName())
-      .replace(':clusterId', clusterId)
-      .replace(':desktopName', desktopName)
-      .replace(':username', username);
-
-    setTdpClient(new TdpClient(addr));
-  }, [clusterId, username, desktopName]);
 
   /**
    * Synchronize the canvas resolution and display size with the
@@ -107,7 +97,7 @@ export default function useTdpClientCanvas(props: Props) {
     // The first image fragment we see signals a successful TDP connection.
     if (!initialTdpConnectionSucceeded.current) {
       syncCanvas(ctx.canvas, getDisplaySize());
-      setTdpConnection({ status: 'success' });
+      // setTdpConnection({ status: 'success' });
       initialTdpConnectionSucceeded.current = true;
     }
     ctx.drawImage(pngFrame.data, pngFrame.left, pngFrame.top);
@@ -120,7 +110,7 @@ export default function useTdpClientCanvas(props: Props) {
   ) => {
     // The first image fragment we see signals a successful TDP connection.
     if (!initialTdpConnectionSucceeded.current) {
-      setTdpConnection({ status: 'success' });
+      // setTdpConnection({ status: 'success' });
       initialTdpConnectionSucceeded.current = true;
     }
     ctx.putImageData(bmpFrame.image_data, bmpFrame.left, bmpFrame.top);
@@ -133,62 +123,6 @@ export default function useTdpClientCanvas(props: Props) {
     spec: ClientScreenSpec
   ) => {
     syncCanvas(canvas, spec);
-  };
-
-  // Default TdpClientEvent.TDP_CLIPBOARD_DATA handler.
-  const clientOnClipboardData = async (clipboardData: ClipboardData) => {
-    if (
-      clipboardData.data &&
-      (await sysClipboardGuard(clipboardSharingState, 'write'))
-    ) {
-      navigator.clipboard.writeText(clipboardData.data);
-      let digest = await Sha256Digest(clipboardData.data, encoder.current);
-      latestClipboardDigest.current = digest;
-    }
-  };
-
-  // Default TdpClientEvent.TDP_ERROR and TdpClientEvent.CLIENT_ERROR handler
-  const clientOnTdpError = (error: Error) => {
-    setDirectorySharingState(defaultDirectorySharingState);
-    setClipboardSharingState(defaultClipboardSharingState);
-    setTdpConnection(prevState => {
-      // Sometimes when a connection closes due to an error, we get a cascade of
-      // errors. Here we update the status only if it's not already 'failed', so
-      // that the first error message (which is usually the most informative) is
-      // displayed to the user.
-      if (prevState.status !== 'failed') {
-        return {
-          status: 'failed',
-          statusText: error.message || error.toString(),
-        };
-      }
-      return prevState;
-    });
-  };
-
-  // Default TdpClientEvent.TDP_WARNING and TdpClientEvent.CLIENT_WARNING handler
-  const clientOnTdpWarning = (warning: string) => {
-    setAlerts(prevState => {
-      return [
-        ...prevState,
-        {
-          content: warning,
-          severity: 'warn',
-          id: crypto.randomUUID(),
-        },
-      ];
-    });
-  };
-
-  // TODO(zmb3): this is not what an info-level alert should do.
-  // rename it to something like onGracefulDisconnect
-  const clientOnTdpInfo = (info: string) => {
-    setDirectorySharingState(defaultDirectorySharingState);
-    setClipboardSharingState(defaultClipboardSharingState);
-    setTdpConnection({
-      status: '', // gracefully disconnecting
-      statusText: info,
-    });
   };
 
   const canvasOnKeyDown = (cli: TdpClient, e: KeyboardEvent) => {
@@ -334,36 +268,3 @@ type Props = {
   setDirectorySharingState: Setter<DirectorySharingState>;
   setAlerts: Setter<NotificationItem[]>;
 };
-
-/**
- * To be called before any system clipboard read/write operation.
- */
-async function sysClipboardGuard(
-  clipboardSharingState: ClipboardSharingState,
-  checkingFor: 'read' | 'write'
-): Promise<boolean> {
-  // If we're not allowed to share the clipboard according to the acl
-  // or due to the browser we're using, never try to read or write.
-  if (!clipboardSharingPossible(clipboardSharingState)) {
-    return false;
-  }
-
-  // If the relevant state is 'prompt', try the operation so that the
-  // user is prompted to allow it.
-  const checkingForRead = checkingFor === 'read';
-  const checkingForWrite = checkingFor === 'write';
-  const relevantStateIsPrompt =
-    (checkingForRead && clipboardSharingState.readState === 'prompt') ||
-    (checkingForWrite && clipboardSharingState.writeState === 'prompt');
-  if (relevantStateIsPrompt) {
-    return true;
-  }
-
-  // Otherwise try only if both read and write permissions are granted
-  // and the document has focus (without focus we get an uncatchable error).
-  //
-  // Note that there's no situation where only one of read or write is granted,
-  // but the other is denied, and we want to try the operation. The feature is
-  // either fully enabled or fully disabled.
-  return isSharingClipboard(clipboardSharingState) && document.hasFocus();
-}

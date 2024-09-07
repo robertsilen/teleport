@@ -84,6 +84,9 @@ export function DesktopSession(props: State) {
     alerts,
     onRemoveAlert,
     fetchAttempt,
+    // should probably just change this to wsStatus or
+    // tdpConnectionStatus and keep track of those things together
+    // in a single useState instead of Attempt
     tdpConnection,
     showAnotherSessionActiveDialog,
   } = props;
