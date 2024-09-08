@@ -49,7 +49,7 @@ func TestSanitize(t *testing.T) {
 			assert: require.Error,
 		},
 		{
-			inKey:  NewKey("namespaces", "..", "params"),
+			inKey:  NewKey("namespaces", "..params"),
 			assert: require.NoError,
 		},
 		{

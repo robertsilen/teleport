@@ -259,7 +259,7 @@ func (c *CircularBuffer) NewWatcher(ctx context.Context, watch Watch) (Watcher, 
 	if len(watch.Prefixes) == 0 {
 		// if watcher has no prefixes, assume it will match anything
 		// starting from the separator (what includes all keys in backend invariant, see Keys function)
-		watch.Prefixes = append(watch.Prefixes, []string{Separator})
+		watch.Prefixes = append(watch.Prefixes, Key{})
 	} else {
 		// if watcher's prefixes are redundant, keep only shorter prefixes
 		// to avoid double fan out

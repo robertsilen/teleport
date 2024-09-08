@@ -57,8 +57,8 @@ func TestRangeEnd(t *testing.T) {
 			expected: NewKey("xy{"),
 		},
 		{
-			key:      NewKey("xFF"),
-			expected: NewKey("x00"),
+			key:      NewKey("\xFF"),
+			expected: NewKey("\x00"),
 		},
 		{
 			key:      NewKey("\xFF\xFF\xFF"),
