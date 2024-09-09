@@ -31,18 +31,18 @@ import type {
 
 function TdpClientCanvas(props: Props) {
   const {
-    client,
-    clientShouldConnect = false,
-    clientScreenSpecToRequest,
-    clientOnPngFrame,
-    clientOnBmpFrame,
-    clientOnClipboardData,
-    clientOnTdpError,
-    clientOnTdpWarning,
-    clientOnTdpInfo,
-    clientOnWsClose,
-    clientOnWsOpen,
-    clientOnClientScreenSpec,
+    // client,
+    // clientShouldConnect = false,
+    // clientScreenSpecToRequest,
+    // clientOnPngFrame,
+    // clientOnBmpFrame,
+    // clientOnClipboardData,
+    // clientOnTdpError,
+    // clientOnTdpWarning,
+    // clientOnTdpInfo,
+    // clientOnWsClose,
+    // clientOnWsOpen,
+    // clientOnClientScreenSpec,
     canvasOnKeyDown,
     canvasOnKeyUp,
     canvasOnFocusOut,
@@ -71,35 +71,35 @@ function TdpClientCanvas(props: Props) {
     }
   }, []);
 
-  useEffect(() => {
-    if (client && clientOnPngFrame) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
+  // useEffect(() => {
+  //   if (client && clientOnPngFrame) {
+  //     const canvas = canvasRef.current;
+  //     const ctx = canvas.getContext('2d');
 
-      // Buffered rendering logic
-      var pngBuffer: PngFrame[] = [];
-      const renderBuffer = () => {
-        if (pngBuffer.length) {
-          for (let i = 0; i < pngBuffer.length; i++) {
-            clientOnPngFrame(ctx, pngBuffer[i]);
-          }
-          pngBuffer = [];
-        }
-        requestAnimationFrame(renderBuffer);
-      };
-      requestAnimationFrame(renderBuffer);
+  //     // Buffered rendering logic
+  //     var pngBuffer: PngFrame[] = [];
+  //     const renderBuffer = () => {
+  //       if (pngBuffer.length) {
+  //         for (let i = 0; i < pngBuffer.length; i++) {
+  //           clientOnPngFrame(ctx, pngBuffer[i]);
+  //         }
+  //         pngBuffer = [];
+  //       }
+  //       requestAnimationFrame(renderBuffer);
+  //     };
+  //     requestAnimationFrame(renderBuffer);
 
-      const pushToPngBuffer = (pngFrame: PngFrame) => {
-        pngBuffer.push(pngFrame);
-      };
+  //     const pushToPngBuffer = (pngFrame: PngFrame) => {
+  //       pngBuffer.push(pngFrame);
+  //     };
 
-      client.on(TdpClientEvent.TDP_PNG_FRAME, pushToPngBuffer);
+  //     client.on(TdpClientEvent.TDP_PNG_FRAME, pushToPngBuffer);
 
-      return () => {
-        client.removeListener(TdpClientEvent.TDP_PNG_FRAME, pushToPngBuffer);
-      };
-    }
-  }, [client, clientOnPngFrame]);
+  //     return () => {
+  //       client.removeListener(TdpClientEvent.TDP_PNG_FRAME, pushToPngBuffer);
+  //     };
+  //   }
+  // }, [client, clientOnPngFrame]);
 
   useEffect(() => {
     if (client && updatePointer) {
@@ -409,46 +409,36 @@ function TdpClientCanvas(props: Props) {
     }
   }, [client]);
 
-  // Call connect after all listeners have been registered
-  useEffect(() => {
-    if (client && clientShouldConnect) {
-      client.connect(clientScreenSpecToRequest);
-      return () => {
-        client.shutdown();
-      };
-    }
-  }, [client, clientShouldConnect]);
-
   return <canvas style={{ ...style }} ref={canvasRef} />;
 }
 
 export type Props = {
-  client: TdpClient;
-  // clientShouldConnect determines whether the TdpClientCanvas
-  // will try to connect to the server.
-  clientShouldConnect?: boolean;
-  // clientScreenSpecToRequest will be passed to client.connect() if
-  // clientShouldConnect is true.
-  clientScreenSpecToRequest?: ClientScreenSpec;
-  clientOnPngFrame?: (
-    ctx: CanvasRenderingContext2D,
-    pngFrame: PngFrame
-  ) => void;
-  clientOnBmpFrame?: (
-    ctx: CanvasRenderingContext2D,
-    pngFrame: BitmapFrame
-  ) => void;
-  clientOnClipboardData?: (clipboardData: ClipboardData) => void;
-  clientOnTdpError?: (error: Error) => void;
-  clientOnTdpWarning?: (warning: string) => void;
-  clientOnTdpInfo?: (info: string) => void;
-  clientOnWsClose?: (message: string) => void;
-  clientOnWsOpen?: () => void;
-  clientOnClientScreenSpec?: (
-    cli: TdpClient,
-    canvas: HTMLCanvasElement,
-    spec: ClientScreenSpec
-  ) => void;
+  // client: TdpClient;
+  // // clientShouldConnect determines whether the TdpClientCanvas
+  // // will try to connect to the server.
+  // clientShouldConnect?: boolean;
+  // // clientScreenSpecToRequest will be passed to client.connect() if
+  // // clientShouldConnect is true.
+  // clientScreenSpecToRequest?: ClientScreenSpec;
+  // clientOnPngFrame?: (
+  //   ctx: CanvasRenderingContext2D,
+  //   pngFrame: PngFrame
+  // ) => void;
+  // clientOnBmpFrame?: (
+  //   ctx: CanvasRenderingContext2D,
+  //   pngFrame: BitmapFrame
+  // ) => void;
+  // clientOnClipboardData?: (clipboardData: ClipboardData) => void;
+  // clientOnTdpError?: (error: Error) => void;
+  // clientOnTdpWarning?: (warning: string) => void;
+  // clientOnTdpInfo?: (info: string) => void;
+  // clientOnWsClose?: (message: string) => void;
+  // clientOnWsOpen?: () => void;
+  // clientOnClientScreenSpec?: (
+  //   cli: TdpClient,
+  //   canvas: HTMLCanvasElement,
+  //   spec: ClientScreenSpec
+  // ) => void;
   canvasOnKeyDown?: (cli: TdpClient, e: KeyboardEvent) => void;
   canvasOnKeyUp?: (cli: TdpClient, e: KeyboardEvent) => void;
   canvasOnFocusOut?: (cli: TdpClient) => void;

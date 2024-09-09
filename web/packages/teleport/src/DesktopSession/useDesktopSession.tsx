@@ -38,15 +38,25 @@ import { Sha256Digest } from 'teleport/lib/util';
 import cfg from 'teleport/config';
 
 import useTdpClientCanvas from './useTdpClientCanvas';
+import { TopBarHeight } from './TopBar';
 
 import type { UrlDesktopParams } from 'teleport/config';
 import type { NotificationItem } from 'shared/components/Notification';
+
+export type TdpConnection = {
+  status: '' | 'open' | 'closed';
+  statusText: string;
+};
 
 export default function useDesktopSession() {
   const { attempt: fetchAttempt, run } = useAttempt('processing');
   const latestClipboardDigest = useRef('');
   const encoder = useRef(new TextEncoder());
   const clientCanvasProps = useTdpClientCanvas();
+  const [tdpConnection, setTdpConnection] = useState<TdpConnection>({
+    status: '',
+    statusText: '',
+  });
 
   // // tdpConnection tracks the state of the tdpClient's TDP connection
   // // - 'processing' at first
@@ -143,22 +153,22 @@ export default function useDesktopSession() {
 
   // Default TdpClientEvent.TDP_ERROR and TdpClientEvent.CLIENT_ERROR handler
   const onError = (error: Error) => {
-    setDirectorySharingState(defaultDirectorySharingState);
+    // setDirectorySharingState(defaultDirectorySharingState);
     setClipboardSharingState(defaultClipboardSharingState);
     // should merge this + wsStatus into 1 connection var
-    // setTdpConnection(prevState => {
-    //   // Sometimes when a connection closes due to an error, we get a cascade of
-    //   // errors. Here we update the status only if it's not already 'failed', so
-    //   // that the first error message (which is usually the most informative) is
-    //   // displayed to the user.
-    //   if (prevState.status !== 'failed') {
-    //     return {
-    //       status: 'failed',
-    //       statusText: error.message || error.toString(),
-    //     };
-    //   }
-    //   return prevState;
-    // });
+    setTdpConnection(prevState => {
+      // Sometimes when a connection closes due to an error, we get a cascade of
+      // errors. Here we update the status only if it's not already 'failed', so
+      // that the first error message (which is usually the most informative) is
+      // displayed to the user.
+      if (prevState.status !== 'closed') {
+        return {
+          status: 'closed',
+          statusText: error.message || error.toString(),
+        };
+      }
+      return prevState;
+    });
   };
 
   // Default TdpClientEvent.TDP_WARNING and TdpClientEvent.CLIENT_WARNING handler
@@ -178,7 +188,8 @@ export default function useDesktopSession() {
   // TODO(zmb3): this is not what an info-level alert should do.
   // rename it to something like onGracefulDisconnect
   const onInfo = (info: string) => {
-    setDirectorySharingState(defaultDirectorySharingState);
+    console.log({ info });
+    // setDirectorySharingState(defaultDirectorySharingState);
     setClipboardSharingState(defaultClipboardSharingState);
     // setTdpConnection({
     //   status: '', // gracefully disconnecting
@@ -186,9 +197,43 @@ export default function useDesktopSession() {
     // });
   };
 
-  setTdpClient(
-    new TdpClient(addr, { onClipboardData, onError, onWarning, onInfo })
-  );
+  const onWsOpen = () => {
+    setTdpConnection({ status: 'open', statusText: '' });
+  };
+
+  const onWsClose = (message: string) => {
+    setTdpConnection({ status: 'closed', statusText: message });
+  };
+
+  useEffect(() => {
+    if (!tdpClient) {
+      setTdpClient(
+        new TdpClient(addr, {
+          onClipboardData,
+          onError,
+          onWarning,
+          onInfo,
+          onWsOpen,
+          onWsClose,
+        })
+      );
+    }
+  }, [tdpClient, addr]);
+
+  const sendLocalClipboardToRemote = async (cli: TdpClient) => {
+    if (await sysClipboardGuard(clipboardSharingState, 'read')) {
+      navigator.clipboard.readText().then(text => {
+        Sha256Digest(text, encoder.current).then(digest => {
+          if (text && digest !== latestClipboardDigest.current) {
+            cli.sendClipboardData({
+              data: text,
+            });
+            latestClipboardDigest.current = digest;
+          }
+        });
+      });
+    }
+  };
 
   const webauthn = useWebAuthn(tdpClient);
 
@@ -256,6 +301,8 @@ export default function useDesktopSession() {
   };
 
   return {
+    tdpClient,
+    tdpConnection,
     hostname,
     username,
     clipboardSharingState,
@@ -272,9 +319,10 @@ export default function useDesktopSession() {
     onCtrlAltDel,
     alerts,
     onRemoveAlert,
-    // this shouldn't be spread, but passed as its own object and
-    // _then_ spread as props into `TdpCanvas`
-    ...clientCanvasProps,
+    // // this shouldn't be spread, but passed as its own object and
+    // // _then_ spread as props into `TdpCanvas`
+    // // ...clientCanvasProps,
+    clientCanvasProps,
   };
 }
 
@@ -474,4 +522,14 @@ function sysClipboardGuard(
   // but the other is denied, and we want to try the operation. The feature is
   // either fully enabled or fully disabled.
   return isSharingClipboard(clipboardSharingState) && document.hasFocus();
+}
+
+// Calculates the size (in pixels) of the display.
+// Since we want to maximize the display size for the user, this is simply
+// the full width of the screen and the full height sans top bar.
+export function getDisplaySize() {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight - TopBarHeight,
+  };
 }

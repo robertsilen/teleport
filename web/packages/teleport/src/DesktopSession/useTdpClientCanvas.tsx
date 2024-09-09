@@ -16,30 +16,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { Attempt } from 'shared/hooks/useAttemptNext';
-import { NotificationItem } from 'shared/components/Notification';
+import { useEffect, useRef, MutableRefObject } from 'react';
 import { debounce } from 'shared/utils/highbar';
 
 import { TdpClient, ButtonState, ScrollAxis } from 'teleport/lib/tdp';
-import {
-  ClientScreenSpec,
-  ClipboardData,
-  PngFrame,
-} from 'teleport/lib/tdp/codec';
-import { Sha256Digest } from 'teleport/lib/util';
+import { ClientScreenSpec, PngFrame } from 'teleport/lib/tdp/codec';
 
-import { TopBarHeight } from './TopBar';
-import {
-  ClipboardSharingState,
-  DirectorySharingState,
-  Setter,
-  clipboardSharingPossible,
-  defaultClipboardSharingState,
-  defaultDirectorySharingState,
-  isSharingClipboard,
-} from './useDesktopSession';
 import { KeyboardHandler } from './KeyboardHandler';
+import { getDisplaySize } from './useDesktopSession';
 
 import type { BitmapFrame } from 'teleport/lib/tdp/client';
 
@@ -60,6 +44,8 @@ export default function useTdpClientCanvas() {
   //   setDirectorySharingState,
   //   setAlerts,
   // } = props;
+
+  const canvasRef = useRef<MutableRefObject<HTMLCanvasElement>>(null);
 
   // this should be moved into part of wsStatus probably.
   // really, the only thing its doing is tracking when we've received
@@ -132,16 +118,18 @@ export default function useTdpClientCanvas() {
       state: ButtonState.DOWN,
     });
 
-    // The key codes in the if clause below are those that have been empirically determined not
-    // to count as transient activation events. According to the documentation, a keydown for
-    // the Esc key and any "shortcut key reserved by the user agent" don't count as activation
-    // events: https://developer.mozilla.org/en-US/docs/Web/Security/User_activation.
-    if (e.key !== 'Meta' && e.key !== 'Alt' && e.key !== 'Escape') {
-      // Opportunistically sync local clipboard to remote while
-      // transient user activation is in effect.
-      // https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/readText#security
-      sendLocalClipboardToRemote(cli);
-    }
+    // TODO (avatus): figure where to call this in client data
+
+    // // The key codes in the if clause below are those that have been empirically determined not
+    // // to count as transient activation events. According to the documentation, a keydown for
+    // // the Esc key and any "shortcut key reserved by the user agent" don't count as activation
+    // // events: https://developer.mozilla.org/en-US/docs/Web/Security/User_activation.
+    // if (e.key !== 'Meta' && e.key !== 'Alt' && e.key !== 'Escape') {
+    //   // Opportunistically sync local clipboard to remote while
+    //   // transient user activation is in effect.
+    //   // https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/readText#security
+    //   sendLocalClipboardToRemote(cli);
+    // }
   };
 
   const canvasOnKeyUp = (cli: TdpClient, e: KeyboardEvent) => {
@@ -172,10 +160,11 @@ export default function useTdpClientCanvas() {
       cli.sendMouseButton(e.button, ButtonState.DOWN);
     }
 
-    // Opportunistically sync local clipboard to remote while
-    // transient user activation is in effect.
-    // https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/readText#security
-    sendLocalClipboardToRemote(cli);
+    // TODO (avatus) : figure out where to call this in client data
+    // // Opportunistically sync local clipboard to remote while
+    // // transient user activation is in effect.
+    // // https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/readText#security
+    // sendLocalClipboardToRemote(cli);
   };
 
   const canvasOnMouseUp = (cli: TdpClient, e: MouseEvent) => {
@@ -211,31 +200,11 @@ export default function useTdpClientCanvas() {
     { trailing: true }
   );
 
-  const sendLocalClipboardToRemote = async (cli: TdpClient) => {
-    if (await sysClipboardGuard(clipboardSharingState, 'read')) {
-      navigator.clipboard.readText().then(text => {
-        Sha256Digest(text, encoder.current).then(digest => {
-          if (text && digest !== latestClipboardDigest.current) {
-            cli.sendClipboardData({
-              data: text,
-            });
-            latestClipboardDigest.current = digest;
-          }
-        });
-      });
-    }
-  };
-
   return {
-    tdpClient,
-    clientScreenSpecToRequest: getDisplaySize(),
     clientOnPngFrame,
     clientOnBitmapFrame,
     clientOnClientScreenSpec,
-    clientOnTdpError,
-    clientOnClipboardData,
-    clientOnTdpWarning,
-    clientOnTdpInfo,
+    canvasRef,
     canvasOnKeyDown,
     canvasOnKeyUp,
     canvasOnFocusOut,
@@ -248,23 +217,13 @@ export default function useTdpClientCanvas() {
   };
 }
 
-// Calculates the size (in pixels) of the display.
-// Since we want to maximize the display size for the user, this is simply
-// the full width of the screen and the full height sans top bar.
-function getDisplaySize() {
-  return {
-    width: window.innerWidth,
-    height: window.innerHeight - TopBarHeight,
-  };
-}
-
-type Props = {
-  username: string;
-  desktopName: string;
-  clusterId: string;
-  setTdpConnection: Setter<Attempt>;
-  clipboardSharingState: ClipboardSharingState;
-  setClipboardSharingState: Setter<ClipboardSharingState>;
-  setDirectorySharingState: Setter<DirectorySharingState>;
-  setAlerts: Setter<NotificationItem[]>;
-};
+// type Props = {
+//   username: string;
+//   desktopName: string;
+//   clusterId: string;
+//   setTdpConnection: Setter<Attempt>;
+//   clipboardSharingState: ClipboardSharingState;
+//   setClipboardSharingState: Setter<ClipboardSharingState>;
+//   setDirectorySharingState: Setter<DirectorySharingState>;
+//   setAlerts: Setter<NotificationItem[]>;
+// };
