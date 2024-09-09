@@ -17,10 +17,22 @@
  */
 
 import React, { PropsWithChildren, useState } from 'react';
-import styled from 'styled-components';
+import styled, { useTheme } from 'styled-components';
 
-import { Popover, Text } from 'design';
+import { Box, Popover, Text } from 'design';
 import * as Icons from 'design/Icon';
+import { Origin, Position } from 'design/Popover/Popover';
+
+type ToolTipCommonProps = {
+  trigger?: 'click' | 'hover';
+  muteIconColor?: boolean;
+  sticky?: boolean;
+  maxWidth?: number;
+  kind?: 'info' | 'warning' | 'error';
+  position?: Position;
+};
+
+type ToolTipProps = ToolTipCommonProps & {};
 
 export const ToolTipInfo: React.FC<
   PropsWithChildren<{
@@ -29,6 +41,7 @@ export const ToolTipInfo: React.FC<
     sticky?: boolean;
     maxWidth?: number;
     kind?: 'info' | 'warning' | 'error';
+    position?: Position;
   }>
 > = ({
   children,
@@ -37,7 +50,9 @@ export const ToolTipInfo: React.FC<
   sticky = false,
   maxWidth = 350,
   kind = 'info',
+  position = 'bottom',
 }) => {
+  const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState();
   const open = Boolean(anchorEl);
 
@@ -87,17 +102,20 @@ export const ToolTipInfo: React.FC<
         modalCss={() =>
           trigger === 'hover' && `pointer-events: ${sticky ? 'auto' : 'none'}`
         }
+        popoverCss={() => ({
+          backdropFilter: 'blur(2px)',
+        })}
+        arrowCss={() => ({
+          backdropFilter: 'blur(2px)',
+        })}
         onClose={handlePopoverClose}
         open={open}
         anchorEl={anchorEl}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
+        anchorOrigin={anchorOriginForPosition(position)}
+        transformOrigin={transformOriginForPosition(position)}
+        arrow
+        bg="tooltip.background"
+        popoverMargin={4}
       >
         <StyledOnHover px={3} py={2} $maxWidth={maxWidth}>
           {children}
@@ -107,9 +125,34 @@ export const ToolTipInfo: React.FC<
   );
 };
 
+const anchorOriginForPosition = (pos: Position): Origin => {
+  switch (pos) {
+    case 'top':
+      return { horizontal: 'center', vertical: 'top' };
+    case 'right':
+      return { horizontal: 'right', vertical: 'center' };
+    case 'bottom':
+      return { horizontal: 'center', vertical: 'bottom' };
+    case 'left':
+      return { horizontal: 'left', vertical: 'center' };
+  }
+};
+
+const transformOriginForPosition = (pos: Position): Origin => {
+  switch (pos) {
+    case 'top':
+      return { horizontal: 'center', vertical: 'bottom' };
+    case 'right':
+      return { horizontal: 'left', vertical: 'center' };
+    case 'bottom':
+      return { horizontal: 'center', vertical: 'top' };
+    case 'left':
+      return { horizontal: 'right', vertical: 'center' };
+  }
+};
+
 const StyledOnHover = styled(Text)<{ $maxWidth: number }>`
-  color: ${props => props.theme.colors.text.main};
-  background-color: ${props => props.theme.colors.tooltip.background};
+  color: ${props => props.theme.colors.text.primaryInverse};
   max-width: ${p => p.$maxWidth}px;
 `;
 

@@ -40,28 +40,37 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-import React, { createRef, MutableRefObject } from 'react';
-import styled, { CSSProp, StyleFunction } from 'styled-components';
+import React, { createRef, forwardRef, MutableRefObject } from 'react';
+import styled, { CSSProp, withTheme } from 'styled-components';
 
 import Modal, { BackdropProps, Props as ModalProps } from '../Modal';
+import { Transition } from './Transition';
+import { color, ResponsiveValue, ThemeValue } from 'styled-system';
+import { Theme } from 'design/theme/themes/types';
+import Box, { BoxProps } from 'design/Box';
+import { CSSObject } from 'styled-components';
+import Flex from 'design/Flex';
 
+type Offset = { top: number; left: number };
+type Rect = Offset & { bottom: number; right: number };
 type Dimensions = { width: number; height: number };
 
 export type Origin = {
-  horizontal: HorizontalAnchor;
-  vertical: VerticalAnchor;
+  horizontal: HorizontalOrigin;
+  vertical: VerticalOrigin;
 };
 
-export type HorizontalAnchor = 'left' | 'center' | 'right' | number;
-export type VerticalAnchor = 'top' | 'center' | 'bottom' | number;
+export type HorizontalOrigin = 'left' | 'center' | 'right' | number;
+export type VerticalOrigin = 'top' | 'center' | 'bottom' | number;
 export type GrowDirections = 'top-left' | 'bottom-right';
+export type Position = 'top' | 'right' | 'bottom' | 'left';
 
 type NumericOrigin = {
   horizontal: number;
   vertical: number;
 };
 
-function getOffsetTop(rect: Dimensions, vertical: VerticalAnchor): number {
+function getOffsetTop(rect: Dimensions, vertical: VerticalOrigin): number {
   let offset = 0;
 
   if (typeof vertical === 'number') {
@@ -75,7 +84,7 @@ function getOffsetTop(rect: Dimensions, vertical: VerticalAnchor): number {
   return offset;
 }
 
-function getOffsetLeft(rect: Dimensions, horizontal: HorizontalAnchor): number {
+function getOffsetLeft(rect: Dimensions, horizontal: HorizontalOrigin): number {
   let offset = 0;
 
   if (typeof horizontal === 'number') {
@@ -87,6 +96,79 @@ function getOffsetLeft(rect: Dimensions, horizontal: HorizontalAnchor): number {
   }
 
   return offset;
+}
+
+/**
+ * Returns popover position, relative to the anchor. If unambiguously defined by
+ * the transform origin, returns this one. The ambiguous cases (transform origin
+ * on one of the popover corners) are resolved by looking into the anchor
+ * origin. If still ambiguous (corner touching a corner), prefers a vertical
+ * position.
+ */
+function getPopoverPosition(
+  anchorOrigin: Origin,
+  transformOrigin: Origin
+): Position | null {
+  const allowedByTransformOrigin = getAllowedPopoverPositions(transformOrigin);
+  switch (allowedByTransformOrigin.length) {
+    case 0:
+      return null;
+    case 1:
+      return allowedByTransformOrigin[0];
+
+    default: {
+      const preferredByAnchorOrigin =
+        getPreferredPopoverPositions(anchorOrigin);
+      const resolved = allowedByTransformOrigin.filter(d =>
+        preferredByAnchorOrigin.includes(d)
+      );
+      if (resolved.length === 0) return null;
+      return resolved[0];
+    }
+  }
+}
+
+function getAllowedPopoverPositions(transformOrigin: Origin) {
+  const allowed: Position[] = [];
+  // Note: order matters here. The first one will be preferred when no
+  // unambiguous decision is reached, so we arbitrarily prefer vertical over
+  // horizontal arrows.
+  if (transformOrigin.vertical === 'top') allowed.push('bottom');
+  if (transformOrigin.vertical === 'bottom') allowed.push('top');
+  if (transformOrigin.horizontal === 'left') allowed.push('right');
+  if (transformOrigin.horizontal === 'right') allowed.push('left');
+  return allowed;
+}
+
+function getPreferredPopoverPositions(anchorOrigin: Origin) {
+  const preferred: Position[] = [];
+  if (anchorOrigin.vertical === 'top') preferred.push('top');
+  if (anchorOrigin.vertical === 'bottom') preferred.push('bottom');
+  if (anchorOrigin.horizontal === 'left') preferred.push('left');
+  if (anchorOrigin.horizontal === 'right') preferred.push('right');
+  return preferred;
+}
+
+function getPopoverMarginTop(
+  popoverPos: Position | null,
+  arrow: boolean,
+  popoverMargin: number
+): number {
+  const margin = arrow ? popoverMargin + arrowLength : popoverMargin;
+  if (popoverPos === 'top') return margin;
+  if (popoverPos === 'bottom') return -margin;
+  return 0;
+}
+
+function getPopoverMarginLeft(
+  popoverPos: Position | null,
+  arrow: boolean,
+  popoverMargin: number
+): number {
+  const margin = arrow ? popoverMargin + arrowLength : popoverMargin;
+  if (popoverPos === 'left') return margin;
+  if (popoverPos === 'right') return -margin;
+  return 0;
 }
 
 function getTransformOriginValue(transformOrigin: Origin): string {
@@ -113,8 +195,44 @@ function getAnchorEl(anchorEl: Element | (() => Element)): Element {
   return typeof anchorEl === 'function' ? anchorEl() : anchorEl;
 }
 
-export default class Popover extends React.Component<Props> {
-  paperRef: MutableRefObject<HTMLDivElement> = createRef();
+const arrowLength = 8; //pixels
+const arrowWidth = 2 * arrowLength;
+const arrowArm = Math.SQRT2 * arrowLength;
+
+/**
+ * Constant CSS props of arrows, indexed by the popover position (which is
+ * opposite to the arrow direction).
+ */
+const arrowGeometry = {
+  top: {
+    width: arrowArm,
+    height: arrowArm,
+    marginTop: -(arrowArm - arrowWidth),
+    // transform: 'rotate(45deg)',
+    // clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)',
+  },
+
+  right: {
+    width: arrowLength,
+    height: arrowWidth,
+    clipPath: 'polygon(100% 0%, 100% 100%, 0% 50%)',
+  },
+
+  bottom: {
+    width: arrowWidth,
+    height: arrowArm,
+  },
+
+  left: {
+    width: arrowLength,
+    height: arrowWidth,
+    clipPath: 'polygon(0% 0%, 100% 50%, 0% 100%)',
+  },
+};
+
+class PopoverInternal extends React.Component<ThemedProps> {
+  paperRef = createRef<HTMLDivElement>();
+  arrowRef = createRef<HTMLDivElement>();
   handleResize: () => void;
 
   static defaultProps = {
@@ -129,9 +247,13 @@ export default class Popover extends React.Component<Props> {
       horizontal: 'left',
     },
     growDirections: 'bottom-right',
+    arrow: false,
+    popoverMargin: 0,
+    arrowMargin: 4,
+    bg: 'levels.elevated',
   };
 
-  constructor(props: Props) {
+  constructor(props: ThemedProps) {
     super(props);
 
     if (typeof window !== 'undefined') {
@@ -142,7 +264,7 @@ export default class Popover extends React.Component<Props> {
           return;
         }
 
-        this.setPositioningStyles(this.paperRef.current);
+        this.setPositioningStyles();
       };
     }
   }
@@ -155,40 +277,50 @@ export default class Popover extends React.Component<Props> {
     }
   }
 
-  setPositioningStyles = (element: HTMLElement) => {
-    const positioning = this.getPositioningStyle(element);
+  setPositioningStyles = () => {
+    const paper = this.paperRef.current;
+    const arrow = this.arrowRef.current;
+    const { top, left, bottom, right, transformOrigin, arrowStyle } =
+      this.getPositioningStyle();
 
     if (this.props.growDirections === 'bottom-right') {
-      if (positioning.top !== null) {
-        element.style.top = positioning.top;
+      if (top !== null) {
+        paper.style.top = top;
       }
-      if (positioning.left !== null) {
-        element.style.left = positioning.left;
+      if (left !== null) {
+        paper.style.left = left;
       }
     } else {
-      if (positioning.bottom !== null) {
-        element.style.bottom = positioning.bottom;
+      if (bottom !== null) {
+        paper.style.bottom = bottom;
       }
-      if (positioning.right !== null) {
-        element.style.right = positioning.right;
+      if (right !== null) {
+        paper.style.right = right;
       }
     }
-    element.style.transformOrigin = positioning.transformOrigin;
+    paper.style.transformOrigin = transformOrigin;
+    console.log(arrowStyle);
+
+    if (arrow && arrowStyle) {
+      for (const [prop, value] of Object.entries(arrowStyle)) {
+        arrow.style[prop] = value;
+      }
+    }
   };
 
-  getPositioningStyle = (element: HTMLElement) => {
-    const { anchorReference, marginThreshold } = this.props;
+  getPositioningStyle = () => {
+    const element = this.paperRef.current;
+    const { anchorReference, marginThreshold, arrowMargin, popoverMargin } =
+      this.props;
 
     // Check if the parent has requested anchoring on an inner content node
     const contentAnchorOffset = this.getContentAnchorOffset(element);
-    const elemRect = {
-      width: element.offsetWidth,
-      height: element.offsetHeight,
-    };
+    const elemRect = element.getBoundingClientRect();
 
     // Get the transform origin point on the element itself
     const transformOrigin = this.getTransformOrigin(
       elemRect,
+      popoverMargin,
       contentAnchorOffset
     );
 
@@ -242,18 +374,103 @@ export default class Popover extends React.Component<Props> {
     bottom = top + elemRect.height;
     right = left + elemRect.width;
 
+    const popoverPos = getPopoverPosition(
+      this.props.anchorOrigin,
+      this.props.transformOrigin
+    );
+
+    const arrowStyle = this.getArrowStyle(
+      anchorOffset,
+      { left, right, top, bottom },
+      popoverPos,
+      transformOrigin
+    );
+
     return {
       top: `${top}px`,
       left: `${left}px`,
       bottom: `${window.innerHeight - bottom}px`,
       right: `${window.innerWidth - right}px`,
       transformOrigin: getTransformOriginValue(transformOrigin),
+      arrowStyle,
+    };
+  };
+
+  getArrowStyle = (
+    anchorOffset: Offset,
+    popoverRect: Rect,
+    popoverPos: Position,
+    transformOrigin: NumericOrigin
+  ): React.CSSProperties | null => {
+    const { arrowMargin, popoverMargin, arrow } = this.props;
+    if (!arrow) {
+      return null;
+    }
+
+    const { width, height } = arrowGeometry[popoverPos];
+
+    let left = anchorOffset.left;
+    switch (popoverPos) {
+      case 'top':
+      case 'bottom':
+        left -= arrowWidth / 2;
+        if (left < popoverRect.left + arrowMargin) {
+          left = popoverRect.left + arrowMargin;
+        } else if (left > popoverRect.right - arrowWidth - arrowMargin) {
+          left = popoverRect.right - arrowWidth - arrowMargin;
+        }
+        break;
+      case 'left':
+        left -= arrowLength + popoverMargin;
+        break;
+      case 'right':
+        left += popoverMargin;
+        break;
+      default:
+        popoverPos satisfies never;
+    }
+
+    let top = anchorOffset.top;
+    switch (popoverPos) {
+      case 'left':
+      case 'right':
+        top -= arrowWidth / 2;
+        if (top < popoverRect.top + arrowMargin) {
+          top = popoverRect.top + arrowMargin;
+        } else if (top > popoverRect.bottom - arrowWidth - arrowMargin) {
+          top = popoverRect.bottom - arrowWidth - arrowMargin;
+        }
+        break;
+      case 'top':
+        top -= arrowLength + popoverMargin;
+        break;
+      case 'bottom':
+        top += popoverMargin;
+        break;
+      default:
+        popoverPos satisfies never;
+    }
+
+    let marginLeft = transformOrigin.horizontal;
+    if (marginLeft < arrowMargin) {
+      marginLeft = arrowMargin;
+    }
+    if (marginLeft > popoverRect.right - arrowWidth - arrowMargin) {
+      marginLeft = popoverRect.right - arrowWidth - arrowMargin;
+    }
+
+    return {
+      // left: `${left}px`,
+      // top: `${top}px`,
+      // width: `${width}px`,
+      // height: `${height}px`,
+      marginLeft: `${marginLeft}px`,
     };
   };
 
   // Returns the top/left offset of the position
   // to attach to on the anchor element (or body if none is provided)
-  getAnchorOffset(contentAnchorOffset: number): { top: number; left: number } {
+  getAnchorOffset(contentAnchorOffset: number): Offset {
     const { anchorEl, anchorOrigin } = this.props;
 
     // If an anchor element wasn't provided, just use the parent body element of this Popover
@@ -295,14 +512,32 @@ export default class Popover extends React.Component<Props> {
   // and taking the content anchor offset into account if in use
   getTransformOrigin(
     elemRect: Dimensions,
+    popoverMargin: number,
     contentAnchorOffset = 0
   ): NumericOrigin {
-    const { transformOrigin } = this.props;
+    const { transformOrigin, anchorOrigin } = this.props;
+
+    const popoverPos = getPopoverPosition(
+      this.props.anchorOrigin,
+      this.props.transformOrigin
+    );
 
     const vertical =
-      getOffsetTop(elemRect, transformOrigin.vertical) + contentAnchorOffset;
+      getOffsetTop(elemRect, transformOrigin.vertical) +
+      getPopoverMarginTop(
+        popoverPos,
+        this.props.arrow,
+        this.props.popoverMargin
+      ) +
+      contentAnchorOffset;
 
-    const horizontal = getOffsetLeft(elemRect, transformOrigin.horizontal);
+    const horizontal =
+      getOffsetLeft(elemRect, transformOrigin.horizontal) +
+      getPopoverMarginLeft(
+        popoverPos,
+        this.props.arrow,
+        this.props.popoverMargin
+      );
 
     return {
       vertical,
@@ -310,24 +545,37 @@ export default class Popover extends React.Component<Props> {
     };
   }
 
-  handleEntering = (element: HTMLElement) => {
+  handleEntering = () => {
     if (this.props.onEntering) {
-      this.props.onEntering(element);
+      this.props.onEntering(this.paperRef.current);
     }
 
-    this.setPositioningStyles(element);
-  };
-
-  setPaperRef = (el: HTMLDivElement) => {
-    if (el && !this.paperRef.current) {
-      this.handleEntering(el);
-    }
-    this.paperRef.current = el;
+    this.setPositioningStyles();
   };
 
   render() {
-    const { children, open, popoverCss, ...other } = this.props;
-    console.log(other);
+    const { children, open, popoverCss, arrowCss, ...other } = this.props;
+    const popoverPos = getPopoverPosition(
+      this.props.anchorOrigin,
+      this.props.transformOrigin
+    );
+    let flexDir;
+    switch (popoverPos) {
+      case 'top':
+        flexDir = 'column-reverse';
+        break;
+      case 'right':
+        flexDir = 'row';
+        break;
+      case 'bottom':
+        flexDir = 'column';
+        break;
+      case 'left':
+        flexDir = 'row-reverse';
+        break;
+      default:
+        popoverPos satisfies never;
+    }
 
     return (
       <Modal
@@ -335,17 +583,68 @@ export default class Popover extends React.Component<Props> {
         BackdropProps={{ invisible: true, ...this.props.backdropProps }}
         {...other}
       >
-        <StyledPopover
-          popoverCss={popoverCss}
-          data-mui-test="Popover"
-          ref={this.setPaperRef}
-        >
-          {children}
-        </StyledPopover>
+        <Transition onEntering={this.handleEntering}>
+          <div>
+            <Flex
+              ref={this.paperRef}
+              flexDirection={flexDir}
+              shadow={!this.props.arrow}
+              // popoverCss={popoverCss}
+              data-mui-test="Popover"
+              style={{
+                position: 'absolute',
+                maxWidth: 'calc(100% - 32px)',
+                maxHeight: 'calc(100% - 32px)',
+              }}
+            >
+              {this.props.arrow && (
+                <Arrow
+                  pos={popoverPos}
+                  ref={this.arrowRef}
+                  /*bg={this.props.bg} css={arrowCss}*/
+                />
+              )}
+              <StyledPopover shadow={!this.props.arrow} bg={this.props.bg}>
+                {children}
+              </StyledPopover>
+            </Flex>
+          </div>
+        </Transition>
       </Modal>
     );
   }
 }
+
+const Popover = withTheme(PopoverInternal) as React.ComponentType<Props>;
+export default Popover;
+
+const Arrow = forwardRef(({ pos, ...rest }, ref) => {
+  const { width, height, marginTop } = arrowGeometry[pos];
+  return (
+    <Box
+      ref={ref}
+      style={{
+        width,
+        height,
+        overflow: 'hidden',
+        background: 'green',
+        alignSelf: 'start',
+      }}
+      {...rest}
+    >
+      <div
+        style={{
+          background: 'red',
+          width: '100%',
+          height: `${height}px`,
+          marginTop: `${marginTop}px`,
+          transformOrigin: 'bottom left',
+          transform: 'rotate(45deg)',
+        }}
+      ></div>
+    </Box>
+  );
+});
 
 interface Props extends Omit<ModalProps, 'children' | 'open'> {
   /**
@@ -436,18 +735,32 @@ interface Props extends Omit<ModalProps, 'children' | 'open'> {
 
   /** Properties applied to the backdrop element. */
   backdropProps?: BackdropProps;
+
+  arrow?: boolean;
+
+  arrowCss?: () => CSSProp;
+
+  popoverMargin?: number;
+
+  arrowMargin?: number;
+
+  bg?: BoxProps['bg'];
 }
 
-export const StyledPopover = styled.div<{ popoverCss?: () => CSSProp }>`
-  box-shadow: ${props => props.theme.boxShadow[1]};
+interface ThemedProps extends Props {
+  theme: Theme;
+}
+
+export const StyledPopover = styled(Flex)<{
+  shadow: boolean;
+  popoverCss?: () => CSSProp;
+}>`
+  box-shadow: ${props => (props.shadow ? props.theme.boxShadow[1] : 'none')};
   border-radius: 4px;
-  max-width: calc(100% - 32px);
-  max-height: calc(100% - 32px);
   min-height: 16px;
   min-width: 16px;
   outline: none;
   overflow-x: hidden;
   overflow-y: auto;
-  position: absolute;
   ${props => props.popoverCss && props.popoverCss()}
 `;
