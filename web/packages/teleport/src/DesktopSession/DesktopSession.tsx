@@ -60,37 +60,15 @@ export function DesktopSession(props: State) {
     username,
     hostname,
     tdpConnection,
-    directorySharingState,
-    setDirectorySharingState,
-    // clientOnPngFrame,
-    // clientOnBitmapFrame,
-    // clientOnClientScreenSpec,
-    // clientOnClipboardData,
-    // clientOnTdpError,
-    // clientOnTdpWarning,
-    // clientOnTdpInfo,
-    // canvasOnKeyDown,
-    // canvasOnKeyUp,
-    // canvasOnFocusOut,
-    // canvasOnMouseMove,
-    // canvasOnMouseDown,
-    // canvasOnMouseUp,
-    // canvasOnMouseWheelScroll,
-    // canvasOnContextMenu,
-    // windowOnResize,
-    // clientScreenSpecToRequest,
-    clipboardSharingState,
-    setClipboardSharingState,
-    onShareDirectory,
     onCtrlAltDel,
     alerts,
     onRemoveAlert,
+    onShareDirectory,
+    onDisconnect,
+    clipboardSharingState,
+    directorySharingState,
     clientCanvasProps,
     fetchAttempt,
-    // should probably just change this to wsStatus or
-    // tdpConnectionStatus and keep track of those things together
-    // in a single useState instead of Attempt
-    // tdpConnection,
     showAnotherSessionActiveDialog,
   } = props;
 
@@ -125,27 +103,13 @@ export function DesktopSession(props: State) {
   return (
     <Flex flexDirection="column">
       <TopBar
-        onDisconnect={() => {
-          // setClipboardSharingState(prevState => ({
-          //   ...prevState,
-          //   isSharing: false,
-          // }));
-          // setDirectorySharingState(prevState => ({
-          //   ...prevState,
-          //   isSharing: false,
-          // }));
-          // tdpClient.shutdown();
-        }}
+        onDisconnect={onDisconnect}
         userHost={`${username}@${hostname}`}
-        canShareDirectory={false}
-        isSharingDirectory={false}
-        isSharingClipboard={false}
-        clipboardSharingMessage={''}
-        onShareDirectory={() => {}}
-        // canShareDirectory={directorySharingPossible(directorySharingState)}
-        // isSharingDirectory={isSharingDirectory(directorySharingState)}
-        // isSharingClipboard={isSharingClipboard(clipboardSharingState)}
-        // clipboardSharingMessage={clipboardSharingMessage(clipboardSharingState)}
+        onShareDirectory={onShareDirectory}
+        canShareDirectory={directorySharingPossible(directorySharingState)} // could probably export this value from useDesktopSession
+        isSharingDirectory={isSharingDirectory(directorySharingState)}
+        isSharingClipboard={isSharingClipboard(clipboardSharingState)}
+        clipboardSharingMessage={clipboardSharingMessage(clipboardSharingState)}
         onCtrlAltDel={onCtrlAltDel}
         alerts={alerts}
         onRemoveAlert={onRemoveAlert}
@@ -160,31 +124,13 @@ export function DesktopSession(props: State) {
       )}
       {screenState.screen === 'processing' && <Processing />}
 
-      {/* <TdpClientCanvas
+      <TdpClientCanvas
+        {...clientCanvasProps}
+        canvasRef={clientCanvasProps.canvasRef}
         style={{
           display: screenState.canvasState.shouldDisplay ? 'flex' : 'none',
         }}
-        // client={tdpClient}
-        // clientShouldConnect={screenState.canvasState.shouldConnect}
-        // clientScreenSpecToRequest={clientScreenSpecToRequest}
-        // clientOnPngFrame={clientOnPngFrame}
-        // clientOnBmpFrame={clientOnBitmapFrame}
-        // clientOnClientScreenSpec={clientOnClientScreenSpec}
-        // clientOnClipboardData={clientOnClipboardData}
-        // clientOnTdpError={clientOnTdpError}
-        // clientOnTdpWarning={clientOnTdpWarning}
-        // clientOnTdpInfo={clientOnTdpInfo}
-        canvasOnKeyDown={canvasOnKeyDown}
-        canvasOnKeyUp={canvasOnKeyUp}
-        canvasOnFocusOut={canvasOnFocusOut}
-        canvasOnMouseMove={canvasOnMouseMove}
-        canvasOnMouseDown={canvasOnMouseDown}
-        canvasOnMouseUp={canvasOnMouseUp}
-        canvasOnMouseWheelScroll={canvasOnMouseWheelScroll}
-        canvasOnContextMenu={canvasOnContextMenu}
-        windowOnResize={windowOnResize}
-        updatePointer={true}
-      /> */}
+      />
     </Flex>
   );
 }
@@ -234,6 +180,7 @@ const AlertDialog = ({ screenState }: { screenState: ScreenState }) => (
   </Dialog>
 );
 
+// TODO (avatus) : dont pass the entire state here if we only need 1 method
 const AnotherSessionActiveDialog = (props: State) => {
   return (
     <Dialog

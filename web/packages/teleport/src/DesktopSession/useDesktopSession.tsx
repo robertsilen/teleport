@@ -25,6 +25,7 @@ import {
   SetStateAction,
 } from 'react';
 import { useParams } from 'react-router';
+import { debounce } from 'shared/utils/highbar';
 
 import useAttempt from 'shared/hooks/useAttemptNext';
 
@@ -33,9 +34,15 @@ import useWebAuthn from 'teleport/lib/useWebAuthn';
 import desktopService from 'teleport/services/desktops';
 import userService from 'teleport/services/user';
 import { getHostName } from 'teleport/services/api';
-import { ClipboardData } from 'teleport/lib/tdp/codec';
+import {
+  ClientScreenSpec,
+  ClipboardData,
+  PngFrame,
+  PointerData,
+} from 'teleport/lib/tdp/codec';
 import { Sha256Digest } from 'teleport/lib/util';
 import cfg from 'teleport/config';
+import { BitmapFrame } from 'teleport/lib/tdp/client';
 
 import useTdpClientCanvas from './useTdpClientCanvas';
 import { TopBarHeight } from './TopBar';
@@ -45,6 +52,7 @@ import type { NotificationItem } from 'shared/components/Notification';
 
 export type TdpConnection = {
   status: '' | 'open' | 'closed';
+  receivedFirstFrame?: boolean;
   statusText: string;
 };
 
@@ -52,7 +60,6 @@ export default function useDesktopSession() {
   const { attempt: fetchAttempt, run } = useAttempt('processing');
   const latestClipboardDigest = useRef('');
   const encoder = useRef(new TextEncoder());
-  const clientCanvasProps = useTdpClientCanvas();
   const [tdpConnection, setTdpConnection] = useState<TdpConnection>({
     status: '',
     statusText: '',
@@ -66,6 +73,7 @@ export default function useDesktopSession() {
   // const { attempt: tdpConnection, setAttempt: setTdpConnection } =
   //   useAttempt('processing');
   const [tdpClient, setTdpClient] = useState<TdpClient>(null);
+  const clientCanvasProps = useTdpClientCanvas(tdpClient);
 
   const { username, desktopName, clusterId } = useParams<UrlDesktopParams>();
 
@@ -151,6 +159,11 @@ export default function useDesktopSession() {
     }
   };
 
+  // example of pulling client and canvas out of tdpclientcanvas
+  const onScreenSpec = (spec: ClientScreenSpec) => {
+    clientCanvasProps.syncCanvas(spec);
+  };
+
   // Default TdpClientEvent.TDP_ERROR and TdpClientEvent.CLIENT_ERROR handler
   const onError = (error: Error) => {
     // setDirectorySharingState(defaultDirectorySharingState);
@@ -188,13 +201,12 @@ export default function useDesktopSession() {
   // TODO(zmb3): this is not what an info-level alert should do.
   // rename it to something like onGracefulDisconnect
   const onInfo = (info: string) => {
-    console.log({ info });
     // setDirectorySharingState(defaultDirectorySharingState);
     setClipboardSharingState(defaultClipboardSharingState);
-    // setTdpConnection({
-    //   status: '', // gracefully disconnecting
-    //   statusText: info,
-    // });
+    setTdpConnection({
+      status: 'closed', // gracefully disconnecting
+      statusText: info,
+    });
   };
 
   const onWsOpen = () => {
@@ -203,6 +215,119 @@ export default function useDesktopSession() {
 
   const onWsClose = (message: string) => {
     setTdpConnection({ status: 'closed', statusText: message });
+  };
+
+  // create a closure to enable rendered buffering and return
+  // the "listener" from it
+  const onBmpFrame = () => {
+    const canvas = clientCanvasProps.canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    const ctx = canvas.getContext('2d');
+
+    // Buffered rendering logic
+    var bmpBuffer: BitmapFrame[] = [];
+    const renderBuffer = () => {
+      if (bmpBuffer.length) {
+        for (let i = 0; i < bmpBuffer.length; i++) {
+          // not sure why we sync the canvas during first frame when it doesn't seem
+          // to care about any of the frame data at all? and we sync canvas
+          if (!tdpConnection.receivedFirstFrame) {
+            setTdpConnection(prevState => ({
+              ...prevState,
+              receivedFirstFrame: true,
+            }));
+          }
+          const bmpFrame = bmpBuffer[i];
+          if (ctx) {
+            ctx.putImageData(bmpFrame.image_data, bmpFrame.left, bmpFrame.top);
+          }
+        }
+        bmpBuffer = [];
+      }
+      requestAnimationFrame(renderBuffer);
+    };
+    requestAnimationFrame(renderBuffer);
+
+    const pushToBmpBuffer = (bmpFrame: BitmapFrame) => {
+      bmpBuffer.push(bmpFrame);
+    };
+    return pushToBmpBuffer;
+  };
+
+  // create a closure to enable rendered buffering and return
+  // the "listener" from it
+  const onPngFrame = () => {
+    const canvas = clientCanvasProps.canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    const ctx = canvas.getContext('2d');
+
+    // Buffered rendering logic
+    var pngBuffer: PngFrame[] = [];
+    const renderBuffer = () => {
+      if (pngBuffer.length) {
+        for (let i = 0; i < pngBuffer.length; i++) {
+          // not sure why we sync the canvas during first frame when it doesn't seem
+          // to care about any of the frame data at all? and we sync canvas
+          if (!tdpConnection.receivedFirstFrame) {
+            setTdpConnection(prevState => ({
+              ...prevState,
+              receivedFirstFrame: true,
+            }));
+            clientCanvasProps.syncCanvas(getDisplaySize());
+          }
+          const pngFrame = pngBuffer[i];
+          if (ctx) {
+            ctx.drawImage(pngFrame.data, pngFrame.left, pngFrame.top);
+          }
+        }
+        pngBuffer = [];
+      }
+      requestAnimationFrame(renderBuffer);
+    };
+    requestAnimationFrame(renderBuffer);
+
+    const pushToPngBuffer = (pngFrame: PngFrame) => {
+      pngBuffer.push(pngFrame);
+    };
+    return pushToPngBuffer;
+  };
+
+  const onPointer = (pointer: PointerData) => {
+    const canvas = clientCanvasProps.canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    if (typeof pointer.data === 'boolean') {
+      canvas.style.cursor = pointer.data ? 'default' : 'none';
+      return;
+    }
+    let cursor = document.createElement('canvas');
+    cursor.width = pointer.data.width;
+    cursor.height = pointer.data.height;
+    cursor
+      .getContext('2d', { colorSpace: pointer.data.colorSpace })
+      .putImageData(pointer.data, 0, 0);
+    if (pointer.data.width > 32 || pointer.data.height > 32) {
+      // scale the cursor down to at most 32px - max size fully supported by browsers
+      const resized = document.createElement('canvas');
+      let scale = Math.min(32 / cursor.width, 32 / cursor.height);
+      resized.width = cursor.width * scale;
+      resized.height = cursor.height * scale;
+
+      let context = resized.getContext('2d', {
+        colorSpace: pointer.data.colorSpace,
+      });
+      context.scale(scale, scale);
+      context.drawImage(cursor, 0, 0);
+      cursor = resized;
+    }
+    canvas.style.cursor = `url(${cursor.toDataURL()}) ${
+      pointer.hotspot_x
+    } ${pointer.hotspot_y}, auto`;
   };
 
   useEffect(() => {
@@ -214,10 +339,16 @@ export default function useDesktopSession() {
           onWarning,
           onInfo,
           onWsOpen,
+          onPngFrame: onPngFrame(), // for buffered rendering
+          onBmpFrame: onBmpFrame(),
+          onScreenSpec,
+          onPointer,
           onWsClose,
         })
       );
     }
+    // TODO (avatus) : fix this
+    // eslint-disable-next-line
   }, [tdpClient, addr]);
 
   const sendLocalClipboardToRemote = async (cli: TdpClient) => {
@@ -236,6 +367,18 @@ export default function useDesktopSession() {
   };
 
   const webauthn = useWebAuthn(tdpClient);
+
+  const onDisconnect = () => {
+    setClipboardSharingState(prevState => ({
+      ...prevState,
+      isSharing: false,
+    }));
+    setDirectorySharingState(prevState => ({
+      ...prevState,
+      isSharing: false,
+    }));
+    tdpClient.shutdown();
+  };
 
   const onShareDirectory = () => {
     try {
@@ -300,29 +443,33 @@ export default function useDesktopSession() {
     tdpClient.sendKeyboardInput('Delete', ButtonState.DOWN);
   };
 
+  const windowOnResize = debounce(
+    () => {
+      const spec = getDisplaySize();
+      tdpClient.resize(spec);
+    },
+    250,
+    { trailing: true }
+  );
+
   return {
-    tdpClient,
-    tdpConnection,
-    hostname,
-    username,
-    clipboardSharingState,
-    setClipboardSharingState,
-    directorySharingState,
-    setDirectorySharingState,
-    fetchAttempt,
-    // tdpConnection,
     webauthn,
-    // setTdpConnection,
-    showAnotherSessionActiveDialog,
-    setShowAnotherSessionActiveDialog,
-    onShareDirectory,
+    tdpClient,
+    username,
+    hostname,
+    tdpConnection,
     onCtrlAltDel,
     alerts,
     onRemoveAlert,
-    // // this shouldn't be spread, but passed as its own object and
-    // // _then_ spread as props into `TdpCanvas`
-    // // ...clientCanvasProps,
+    onDisconnect,
+    clipboardSharingState,
+    directorySharingState,
     clientCanvasProps,
+    fetchAttempt,
+    windowOnResize,
+    onShareDirectory,
+    showAnotherSessionActiveDialog,
+    setShowAnotherSessionActiveDialog,
   };
 }
 
