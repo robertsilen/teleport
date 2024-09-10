@@ -38,7 +38,11 @@ func NewKey(parts ...string) Key {
 
 // KeyFromString creates a Key from its textual representation.
 func KeyFromString(key string) Key {
-	return strings.Split(key, Separator)
+	k := strings.Split(key, Separator)
+	if k[0] == "" && string(key[0]) == Separator {
+		return k[1:]
+	}
+	return k
 }
 
 // ExactKey is like Key, except a Separator is appended to the result

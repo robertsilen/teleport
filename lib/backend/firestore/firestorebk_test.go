@@ -236,7 +236,7 @@ func TestReadBrokenRecord(t *testing.T) {
 		Key:   prefix("legacy-record").String(),
 		Value: "sheep",
 	}
-	_, err = uut.svc.Collection(uut.CollectionName).Doc(uut.keyToDocumentID(backend.Key(lr.Key))).Set(ctx, lr)
+	_, err = uut.svc.Collection(uut.CollectionName).Doc(uut.keyToDocumentID(backend.KeyFromString(lr.Key))).Set(ctx, lr)
 	require.NoError(t, err)
 
 	// Create a broken record with a backend.Key key type.

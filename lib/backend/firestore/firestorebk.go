@@ -248,7 +248,7 @@ func (r *record) isExpired(now time.Time) bool {
 
 func (r *record) backendItem() backend.Item {
 	bi := backend.Item{
-		Key:   backend.Key(r.Key),
+		Key:   backend.KeyFromString(string(r.Key)),
 		Value: r.Value,
 	}
 
@@ -983,7 +983,7 @@ func (b *Backend) watchCollection() error {
 				e = backend.Event{
 					Type: types.OpDelete,
 					Item: backend.Item{
-						Key: r.Key,
+						Key: backend.KeyFromString(string(r.Key)),
 					},
 				}
 			}
