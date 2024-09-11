@@ -82,7 +82,6 @@ import (
 	"github.com/gravitational/teleport/entitlements"
 	"github.com/gravitational/teleport/lib/auth/authclient"
 	"github.com/gravitational/teleport/lib/auth/keystore"
-	"github.com/gravitational/teleport/lib/auth/native"
 	"github.com/gravitational/teleport/lib/auth/userloginstate"
 	wanlib "github.com/gravitational/teleport/lib/auth/webauthn"
 	wantypes "github.com/gravitational/teleport/lib/auth/webauthntypes"
@@ -116,6 +115,7 @@ import (
 	"github.com/gravitational/teleport/lib/srv/db/common/role"
 	"github.com/gravitational/teleport/lib/sshca"
 	"github.com/gravitational/teleport/lib/sshutils"
+	"github.com/gravitational/teleport/lib/terraformcloud"
 	"github.com/gravitational/teleport/lib/tlsca"
 	"github.com/gravitational/teleport/lib/tpm"
 	usagereporter "github.com/gravitational/teleport/lib/usagereporter/teleport"
@@ -147,15 +147,16 @@ const (
 	OSSDesktopsAlertMessage = "Your cluster is beyond its allocation of 5 non-Active Directory Windows desktops. " +
 		"Reach out for unlimited desktops with Teleport Enterprise."
 
-	OSSDesktopAlertLink = "https://goteleport.com/r/upgrade-community?utm_campaign=CTA_windows_local"
-	OSSDesktopsLimit    = 5
+	OSSDesktopsAlertLink     = "https://goteleport.com/r/upgrade-community?utm_campaign=CTA_windows_local"
+	OSSDesktopsAlertLinkText = "Contact Sales"
+	OSSDesktopsLimit         = 5
 )
 
 const (
 	dynamicLabelCheckPeriod  = time.Hour
 	dynamicLabelAlertID      = "dynamic-labels-in-deny-rules"
 	dynamicLabelAlertMessage = "One or more roles has deny rules that include dynamic/ labels. " +
-		"This is not recommended due to the volatitily of dynamic/ labels and is not allowed for new roles. " +
+		"This is not recommended due to the volatility of dynamic/ labels and is not allowed for new roles. " +
 		"(hint: use 'tctl get roles' to find roles that need updating)"
 )
 
@@ -373,8 +374,6 @@ func NewServer(cfg *InitConfig, opts ...ServerOption) (*Server, error) {
 		if !modules.GetModules().Features().GetEntitlement(entitlements.HSM).Enabled {
 			return nil, fmt.Errorf("AWS KMS support requires a license with the HSM feature enabled: %w", ErrRequiresEnterprise)
 		}
-	} else {
-		native.PrecomputeKeys()
 	}
 	keyStore, err := keystore.NewManager(context.Background(), &cfg.KeyStoreConfig, keystoreOpts)
 	if err != nil {
@@ -390,6 +389,13 @@ func NewServer(cfg *InitConfig, opts ...ServerOption) (*Server, error) {
 
 	if cfg.AccessMonitoringRules == nil {
 		cfg.AccessMonitoringRules, err = local.NewAccessMonitoringRulesService(cfg.Backend)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+	}
+
+	if cfg.StaticHostUsers == nil {
+		cfg.StaticHostUsers, err = local.NewStaticHostUserService(cfg.Backend)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -434,6 +440,7 @@ func NewServer(cfg *InitConfig, opts ...ServerOption) (*Server, error) {
 		CrownJewels:               cfg.CrownJewels,
 		BotInstance:               cfg.BotInstance,
 		SPIFFEFederations:         cfg.SPIFFEFederations,
+		StaticHostUser:            cfg.StaticHostUsers,
 	}
 
 	as := Server{
@@ -563,6 +570,12 @@ func NewServer(cfg *InitConfig, opts ...ServerOption) (*Server, error) {
 		)
 	}
 
+	if as.terraformIDTokenValidator == nil {
+		as.terraformIDTokenValidator = terraformcloud.NewIDTokenValidator(terraformcloud.IDTokenValidatorConfig{
+			Clock: as.clock,
+		})
+	}
+
 	// Add in a login hook for generating state during user login.
 	as.ulsGenerator, err = userloginstate.NewGenerator(userloginstate.GeneratorConfig{
 		Log:         log,
@@ -631,6 +644,7 @@ type Services struct {
 	services.AccessGraphSecretsGetter
 	services.DevicesGetter
 	services.SPIFFEFederations
+	services.StaticHostUser
 }
 
 // GetWebSession returns existing web session described by req.
@@ -946,6 +960,11 @@ type Server struct {
 	// server. It can be overridden for the purpose of tests.
 	gcpIDTokenValidator gcpIDTokenValidator
 
+	// terraformIDTokenValidator allows JWTs from Terraform Cloud to be
+	// validated by the auth server using a known JWKS. It can be overridden for
+	// the purpose of tests.
+	terraformIDTokenValidator terraformCloudIDTokenValidator
+
 	// loadAllCAs tells tsh to load the host CAs for all clusters when trying to ssh into a node.
 	loadAllCAs bool
 
@@ -987,6 +1006,10 @@ type Server struct {
 	// directly by [Server].
 	// Used for testing.
 	bcryptCostOverride *int
+
+	// GithubUserAndTeamsOverride overrides the user and teams that would
+	// normally be fetched from the GitHub API. Used for testing.
+	GithubUserAndTeamsOverride func() (*GithubUserResponse, []GithubTeamResponse, error)
 }
 
 // SetSAMLService registers svc as the SAMLService that provides the SAML
@@ -2388,9 +2411,15 @@ type DeviceExtensions tlsca.DeviceExtensions
 type AugmentUserCertificateOpts struct {
 	// SSHAuthorizedKey is an SSH certificate, in the authorized key format, to
 	// augment with opts.
-	// The SSH certificate must be issued for the current authenticated user and
-	// must match their TLS certificate.
+	// The SSH certificate must be issued for the current authenticated user,
+	// and either:
+	// - the public key must match their TLS certificate, or
+	// - SSHKeySatisfiedChallenge must be true.
 	SSHAuthorizedKey []byte
+	// SSHKeySatisfiedChallenge will be true if the user has already
+	// proven that they own the private key associated with SSHAuthorizedKey by
+	// satisfying a signature challenge.
+	SSHKeySatisfiedChallenge bool
 	// DeviceExtensions are the device-aware extensions to add to the certificates
 	// being augmented.
 	DeviceExtensions *DeviceExtensions
@@ -2430,6 +2459,7 @@ func (a *Server) AugmentContextUserCertificates(
 		x509Cert:         x509Cert,
 		x509Identity:     &identity,
 		sshAuthorizedKey: opts.SSHAuthorizedKey,
+		sshKeyVerified:   opts.SSHKeySatisfiedChallenge,
 		deviceExtensions: opts.DeviceExtensions,
 	})
 }
@@ -2505,12 +2535,18 @@ func (a *Server) AugmentWebSessionCertificates(ctx context.Context, opts *Augmen
 		return trace.Wrap(err)
 	}
 
+	// We consider this SSH key to be verified because we take it directly from
+	// the web session. The user doesn't need to verify they own it because the
+	// don't: we own it.
+	const sshKeyVerified = true
+
 	// Augment certificates.
 	newCerts, err := a.augmentUserCertificates(ctx, augmentUserCertificatesOpts{
 		checker:          checker,
 		x509Cert:         x509Cert,
 		x509Identity:     x509Identity,
 		sshAuthorizedKey: session.GetPub(),
+		sshKeyVerified:   sshKeyVerified,
 		deviceExtensions: opts.DeviceExtensions,
 	})
 	if err != nil {
@@ -2529,6 +2565,11 @@ type augmentUserCertificatesOpts struct {
 	x509Cert         *x509.Certificate
 	x509Identity     *tlsca.Identity
 	sshAuthorizedKey []byte
+	// sshKeyVerified means that either the user has proven that they control
+	// the private key associated with sshAuthorizedKey (by signing a
+	// challenge), or it comes from a web session where we know that the cluster
+	// controls the key.
+	sshKeyVerified   bool
 	deviceExtensions *DeviceExtensions
 }
 
@@ -2609,8 +2650,8 @@ func (a *Server) augmentUserCertificates(
 			return nil, trace.BadParameter("identity and SSH user mismatch")
 		case !slices.Equal(filterAndSortPrincipals(sshCert.ValidPrincipals), filterAndSortPrincipals(x509Identity.Principals)):
 			return nil, trace.BadParameter("identity and SSH principals mismatch")
-		case !apisshutils.KeysEqual(sshCert.Key, xPubKey):
-			return nil, trace.BadParameter("x509 and SSH public key mismatch")
+		case !opts.sshKeyVerified && !apisshutils.KeysEqual(sshCert.Key, xPubKey):
+			return nil, trace.BadParameter("x509 and SSH public key mismatch and SSH challenge unsatisfied")
 		// Do not reissue if device extensions are already present.
 		case sshCert.Extensions[teleport.CertExtensionDeviceID] != "",
 			sshCert.Extensions[teleport.CertExtensionDeviceAssetTag] != "",
@@ -4551,9 +4592,11 @@ func (a *Server) RegisterInventoryControlStream(ics client.UpstreamInventoryCont
 		Version:  teleport.Version,
 		ServerID: a.ServerID,
 		Capabilities: &proto.DownstreamInventoryHello_SupportedCapabilities{
-			NodeHeartbeats: true,
-			AppHeartbeats:  true,
-			AppCleanup:     true,
+			NodeHeartbeats:     true,
+			AppHeartbeats:      true,
+			AppCleanup:         true,
+			DatabaseHeartbeats: true,
+			DatabaseCleanup:    true,
 		},
 	}
 	if err := ics.Send(a.CloseContext(), downstreamHello); err != nil {
@@ -5648,7 +5691,8 @@ func (a *Server) syncDesktopsLimitAlert(ctx context.Context) {
 		types.WithAlertSeverity(types.AlertSeverity_MEDIUM),
 		types.WithAlertLabel(types.AlertOnLogin, "yes"),
 		types.WithAlertLabel(types.AlertPermitAll, "yes"),
-		types.WithAlertLabel(types.AlertLink, OSSDesktopAlertLink),
+		types.WithAlertLabel(types.AlertLink, OSSDesktopsAlertLink),
+		types.WithAlertLabel(types.AlertLinkText, OSSDesktopsAlertLinkText),
 		types.WithAlertExpires(time.Now().Add(OSSDesktopsCheckPeriod)))
 	if err != nil {
 		log.Warnf("Can't create OSS non-AD desktops limit alert: %v", err)

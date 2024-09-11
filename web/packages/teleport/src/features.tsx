@@ -215,7 +215,7 @@ export class FeatureUsers implements TeleportFeature {
     title: 'Manage Users',
     path: cfg.routes.users,
     exact: true,
-    component: () => <Users />,
+    component: Users,
   };
 
   hasAccess(flags: FeatureFlags): boolean {
@@ -550,7 +550,7 @@ export class FeatureTrust implements TeleportFeature {
   section = ManagementSection.Clusters;
 
   route = {
-    title: 'Trusted Clusters',
+    title: 'Trusted Root Clusters',
     path: cfg.routes.trustedClusters,
     component: TrustedClusters,
   };

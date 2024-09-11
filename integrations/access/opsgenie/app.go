@@ -85,6 +85,7 @@ func NewOpsgenieApp(ctx context.Context, conf *Config) (*App, error) {
 	opsgenieApp.accessMonitoringRules = accessmonitoring.NewRuleHandler(accessmonitoring.RuleHandlerConfig{
 		Client:                 teleClient,
 		PluginType:             string(conf.BaseConfig.PluginType),
+		PluginName:             pluginName,
 		FetchRecipientCallback: createScheduleRecipient,
 	})
 	opsgenieApp.mainJob = lib.NewServiceJob(opsgenieApp.run)
@@ -309,13 +310,13 @@ func (a *App) getNotifySchedulesAndTeams(ctx context.Context, req types.AccessRe
 	scheduleAnnotationKey := types.TeleportNamespace + types.ReqAnnotationNotifySchedulesLabel
 	schedules, err = common.GetServiceNamesFromAnnotations(req, scheduleAnnotationKey)
 	if err != nil {
-		log.Debugf("No schedules to notifiy in %s", scheduleAnnotationKey)
+		log.Debugf("No schedules to notify in %s", scheduleAnnotationKey)
 	}
 
 	teamAnnotationKey := types.TeleportNamespace + types.ReqAnnotationTeamsLabel
 	teams, err = common.GetServiceNamesFromAnnotations(req, teamAnnotationKey)
 	if err != nil {
-		log.Debugf("No teams to notifiy in %s", teamAnnotationKey)
+		log.Debugf("No teams to notify in %s", teamAnnotationKey)
 	}
 
 	if len(schedules) == 0 && len(teams) == 0 {
