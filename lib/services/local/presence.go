@@ -1193,7 +1193,7 @@ func (s *PresenceService) GetHostUserInteractionTime(ctx context.Context, name s
 
 // GetUserGroups returns all registered user groups.
 func (s *PresenceService) GetUserGroups(ctx context.Context, opts ...services.MarshalOption) ([]types.UserGroup, error) {
-	startKey := backend.ExactKey(userGroupPrefix)
+	startKey := userGroupPrefix.ExactKey()
 	result, err := s.GetRange(ctx, startKey, backend.RangeEnd(startKey), backend.NoLimit)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -1215,7 +1215,7 @@ func (s *PresenceService) GetUserGroups(ctx context.Context, opts ...services.Ma
 
 // GetSAMLIdPServiceProviders returns all registered SAML IdP service providers.
 func (s *PresenceService) GetSAMLIdPServiceProviders(ctx context.Context, opts ...services.MarshalOption) ([]types.SAMLIdPServiceProvider, error) {
-	startKey := backend.ExactKey(samlIDPServiceProviderPrefix)
+	startKey := samlIDPServiceProviderPrefix.ExactKey()
 	result, err := s.GetRange(ctx, startKey, backend.RangeEnd(startKey), backend.NoLimit)
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -1272,19 +1272,19 @@ func (s *PresenceService) listResources(ctx context.Context, req proto.ListResou
 		keyPrefix = []string{windowsDesktopServicesPrefix}
 		unmarshalItemFunc = backendItemToWindowsDesktopService
 	case types.KindWindowsDesktop:
-		keyPrefix = []string{windowsDesktopsPrefix}
+		keyPrefix = windowsDesktopsPrefix.Components()
 		unmarshalItemFunc = backendItemToWindowsDesktop
 	case types.KindKubeServer:
 		keyPrefix = []string{kubeServersPrefix}
 		unmarshalItemFunc = backendItemToKubernetesServer
 	case types.KindUserGroup:
-		keyPrefix = []string{userGroupPrefix}
+		keyPrefix = userGroupPrefix.Components()
 		unmarshalItemFunc = backendItemToUserGroup
 	default:
 		return nil, trace.NotImplemented("%s not implemented at ListResources", req.ResourceType)
 	}
 
-	rangeStart := backend.NewKey(append(keyPrefix, req.StartKey)...)
+	rangeStart := backend.NewKey(keyPrefix...).AppendKey(backend.KeyFromString(req.StartKey))
 	rangeEnd := backend.RangeEnd(backend.ExactKey(keyPrefix...))
 	filter := services.MatchResourceFilter{
 		ResourceKind:   req.ResourceType,

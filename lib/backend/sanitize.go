@@ -21,6 +21,7 @@ package backend
 import (
 	"context"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gravitational/trace"
@@ -36,11 +37,17 @@ var allowPattern = regexp.MustCompile(`^[0-9A-Za-z@_:.\-/+]*$`)
 
 // isKeySafe checks if the passed in key conforms to whitelist
 func isKeySafe(key Key) bool {
-	for _, k := range key {
+	for i, k := range key {
 		switch k {
 		case string(noEnd):
 			continue
-		case ".", "..", "":
+		case ".", "..":
+			return false
+		case "":
+			return i != len(key)
+		}
+
+		if strings.Contains(k, Separator) {
 			return false
 		}
 

@@ -34,7 +34,7 @@ type CrownJewelsService struct {
 	service *generic.ServiceWrapper[*crownjewelv1.CrownJewel]
 }
 
-const crownJewelsKey = "crown_jewels"
+var crownJewelsKey = backend.NewKey("crown_jewels")
 
 // NewCrownJewelsService creates a new CrownJewelsService.
 func NewCrownJewelsService(backend backend.Backend) (*CrownJewelsService, error) {

@@ -32,8 +32,11 @@ import (
 	"github.com/gravitational/teleport/lib/services/local/generic"
 )
 
+var (
+	vnetConfigPrefix = backend.NewKey("vnet_config")
+)
+
 const (
-	vnetConfigPrefix        = "vnet_config"
 	vnetConfigSingletonName = "vnet-config"
 )
 

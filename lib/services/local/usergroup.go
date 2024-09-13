@@ -90,6 +90,6 @@ func (s *UserGroupService) DeleteAllUserGroups(ctx context.Context) error {
 	return trace.Wrap(s.svc.DeleteAllResources(ctx))
 }
 
-const (
-	userGroupPrefix = "user_group"
+var (
+	userGroupPrefix = backend.NewKey("user_group")
 )

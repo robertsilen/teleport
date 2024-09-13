@@ -30,9 +30,9 @@ import (
 	"github.com/gravitational/teleport/lib/services/local/generic"
 )
 
-const (
-	authorizedKeysPrefix = "access_graph_ssh_authorized_keys"
-	privateKeysPrefix    = "access_graph_ssh_private_keys"
+var (
+	authorizedKeysPrefix = backend.NewKey("access_graph_ssh_authorized_keys")
+	privateKeysPrefix    = backend.NewKey("access_graph_ssh_private_keys")
 )
 
 // AccessGraphSecretsService manages secrets found on Teleport Nodes and

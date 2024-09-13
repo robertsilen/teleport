@@ -32,8 +32,8 @@ import (
 	"github.com/gravitational/teleport/lib/services/local/generic"
 )
 
-const (
-	userLoginStatePrefix = "user_login_state"
+var (
+	userLoginStatePrefix = backend.NewKey("user_login_state")
 )
 
 // UserLoginStateService manages user login state resources in the Backend.

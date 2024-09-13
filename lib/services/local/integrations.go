@@ -30,8 +30,8 @@ import (
 	"github.com/gravitational/teleport/lib/services/local/generic"
 )
 
-const (
-	integrationsPrefix = "integrations"
+var (
+	integrationsPrefix = backend.NewKey("integrations")
 )
 
 // IntegrationsService manages Integrations in the Backend.
@@ -132,7 +132,7 @@ func (s *IntegrationsService) DeleteIntegration(ctx context.Context, name string
 		return trace.Wrap(err)
 	}
 	conditionalActions = append(conditionalActions, backend.ConditionalAction{
-		Key:       s.svc.MakeKey(name),
+		Key:       s.svc.MakeKey(backend.NewKey(name)),
 		Condition: backend.Exists(),
 		Action:    backend.Delete(),
 	})

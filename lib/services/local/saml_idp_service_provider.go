@@ -42,11 +42,14 @@ import (
 )
 
 const (
-	samlIDPServiceProviderPrefix        = "saml_idp_service_provider"
-	samlIDPServiceProviderModifyLock    = "saml_idp_service_provider_modify_lock"
 	samlIDPServiceProviderModifyLockTTL = time.Second * 5
 	samlIDPServiceProviderMaxPageSize   = 200
 	samlIDPServiceName                  = "teleport_saml_idp_service"
+)
+
+var (
+	samlIDPServiceProviderPrefix     = backend.NewKey("saml_idp_service_provider")
+	samlIDPServiceProviderModifyLock = backend.NewKey("saml_idp_service_provider_modify_lock")
 )
 
 // SAMLIdPServiceProviderService manages IdP service providers in the Backend.
@@ -135,7 +138,7 @@ func (s *SAMLIdPServiceProviderService) CreateSAMLIdPServiceProvider(ctx context
 		return trace.Wrap(err)
 	}
 
-	item, err := s.svc.MakeBackendItem(sp, sp.GetName())
+	item, err := s.svc.MakeBackendItem(sp, backend.NewKey(sp.GetName()))
 	if err != nil {
 		return trace.Wrap(err)
 	}
@@ -169,7 +172,7 @@ func (s *SAMLIdPServiceProviderService) UpdateSAMLIdPServiceProvider(ctx context
 		return trace.Wrap(err)
 	}
 
-	item, err := s.svc.MakeBackendItem(sp, sp.GetName())
+	item, err := s.svc.MakeBackendItem(sp, backend.NewKey(sp.GetName()))
 	if err != nil {
 		return trace.Wrap(err)
 	}

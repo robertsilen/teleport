@@ -106,7 +106,7 @@ func (s *IdentityService) ListSAMLIdPSessions(ctx context.Context, pageSize int,
 
 // listSessions gets a paginated list of sessions.
 func (s *IdentityService) listSessions(ctx context.Context, pageSize int, pageToken, user string, keyPrefix ...string) ([]types.WebSession, string, error) {
-	rangeStart := backend.NewKey(append(keyPrefix, pageToken)...)
+	rangeStart := backend.NewKey(keyPrefix...).AppendKey(backend.KeyFromString(pageToken))
 	rangeEnd := backend.RangeEnd(backend.ExactKey(keyPrefix...))
 
 	// Adjust page size, so it can't be too large.

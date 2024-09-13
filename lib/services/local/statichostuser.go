@@ -30,8 +30,8 @@ import (
 	"github.com/gravitational/teleport/lib/services/local/generic"
 )
 
-const (
-	staticHostUserPrefix = "static_host_user"
+var (
+	staticHostUserPrefix = backend.NewKey("static_host_user")
 )
 
 // StaticHostUserService manages host users that should be created on SSH nodes.

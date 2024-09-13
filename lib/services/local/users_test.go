@@ -26,6 +26,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1108,7 +1109,7 @@ func TestIdentityService_ListUsers(t *testing.T) {
 		case i == 1:
 			devices = append(devices, dev2)
 			for j := 0; j < 20; j++ {
-				dev, err := services.NewTOTPDevice(uuid.NewString(), base32.StdEncoding.EncodeToString([]byte("abc123")), time.Now())
+				dev, err := services.NewTOTPDevice(user.GetName()+"device"+strconv.Itoa(j), base32.StdEncoding.EncodeToString([]byte("abc123")), time.Now())
 				require.NoError(t, err, "creating otp device failed")
 				devices = append(devices, dev)
 			}

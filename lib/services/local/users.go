@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"io"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -96,7 +97,7 @@ func (s *IdentityService) DeleteAllUsers(ctx context.Context) error {
 
 // ListUsers returns a page of users.
 func (s *IdentityService) ListUsers(ctx context.Context, req *userspb.ListUsersRequest) (*userspb.ListUsersResponse, error) {
-	rangeStart := backend.NewKey(webPrefix, usersPrefix, req.PageToken)
+	rangeStart := backend.NewKey(webPrefix, usersPrefix).AppendKey(backend.KeyFromString(req.PageToken))
 	rangeEnd := backend.RangeEnd(backend.ExactKey(webPrefix, usersPrefix))
 	pageSize := req.PageSize
 
@@ -150,7 +151,8 @@ func (s *IdentityService) ListUsers(ctx context.Context, req *userspb.ListUsersR
 // the next user in the list while still allowing listing to operate
 // without missing any users.
 func nextUserToken(user types.User) string {
-	return backend.RangeEnd(backend.ExactKey(user.GetName())).String()[len(backend.Separator):]
+	key := backend.RangeEnd(backend.ExactKey(user.GetName())).String()
+	return strings.Trim(key, backend.Separator)
 }
 
 // streamUsersWithSecrets is a helper that converts a stream of backend items over the user key range into a stream
@@ -584,7 +586,7 @@ func (s *IdentityService) getUserWithSecrets(ctx context.Context, user string) (
 	var items userItems
 	for _, item := range result.Items {
 		suffix := item.Key.TrimPrefix(startKey)
-		items.Set(suffix.String(), item) // Result of Set i
+		items.Set(suffix, item) // Result of Set i
 	}
 
 	u, err := userFromUserItems(user, items)

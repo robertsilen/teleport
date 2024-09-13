@@ -1229,7 +1229,7 @@ func (p *kubeClusterParser) parse(event backend.Event) (types.Resource, error) {
 
 func newCrownJewelParser() *crownJewelParser {
 	return &crownJewelParser{
-		baseParser: newBaseParser(backend.NewKey(crownJewelsKey)),
+		baseParser: newBaseParser(crownJewelsKey.ExactKey()),
 	}
 }
 
@@ -1475,7 +1475,7 @@ func (p *windowsDesktopServicesParser) parse(event backend.Event) (types.Resourc
 
 func newWindowsDesktopsParser() *windowsDesktopsParser {
 	return &windowsDesktopsParser{
-		baseParser: newBaseParser(backend.NewKey(windowsDesktopsPrefix, "")),
+		baseParser: newBaseParser(windowsDesktopsPrefix.ExactKey()),
 	}
 }
 
@@ -1549,7 +1549,7 @@ type pluginParser struct {
 
 func newPluginParser(loadSecrets bool) *pluginParser {
 	return &pluginParser{
-		baseParser:  newBaseParser(backend.NewKey(pluginsPrefix)),
+		baseParser:  newBaseParser(pluginsPrefix),
 		loadSecrets: loadSecrets,
 	}
 }
@@ -1578,7 +1578,7 @@ func (p *pluginParser) parse(event backend.Event) (types.Resource, error) {
 
 func newSAMLIDPServiceProviderParser() *samlIDPServiceProviderParser {
 	return &samlIDPServiceProviderParser{
-		baseParser: newBaseParser(backend.NewKey(samlIDPServiceProviderPrefix)),
+		baseParser: newBaseParser(samlIDPServiceProviderPrefix),
 	}
 }
 
@@ -1602,7 +1602,7 @@ func (p *samlIDPServiceProviderParser) parse(event backend.Event) (types.Resourc
 
 func newUserGroupParser() *userGroupParser {
 	return &userGroupParser{
-		baseParser: newBaseParser(backend.NewKey(userGroupPrefix)),
+		baseParser: newBaseParser(userGroupPrefix),
 	}
 }
 
@@ -1626,7 +1626,7 @@ func (p *userGroupParser) parse(event backend.Event) (types.Resource, error) {
 
 func newOktaImportRuleParser() *oktaImportRuleParser {
 	return &oktaImportRuleParser{
-		baseParser: newBaseParser(backend.NewKey(oktaImportRulePrefix)),
+		baseParser: newBaseParser(oktaImportRulePrefix),
 	}
 }
 
@@ -1650,7 +1650,7 @@ func (p *oktaImportRuleParser) parse(event backend.Event) (types.Resource, error
 
 func newOktaAssignmentParser() *oktaAssignmentParser {
 	return &oktaAssignmentParser{
-		baseParser: newBaseParser(backend.NewKey(oktaAssignmentPrefix)),
+		baseParser: newBaseParser(oktaAssignmentPrefix),
 	}
 }
 
@@ -1674,7 +1674,7 @@ func (p *oktaAssignmentParser) parse(event backend.Event) (types.Resource, error
 
 func newIntegrationParser() *integrationParser {
 	return &integrationParser{
-		baseParser: newBaseParser(backend.NewKey(integrationsPrefix)),
+		baseParser: newBaseParser(integrationsPrefix),
 	}
 }
 
@@ -1757,7 +1757,7 @@ func (p *headlessAuthenticationParser) parse(event backend.Event) (types.Resourc
 
 func newAccessListParser() *accessListParser {
 	return &accessListParser{
-		baseParser: newBaseParser(backend.ExactKey(accessListPrefix)),
+		baseParser: newBaseParser(accessListPrefix.ExactKey()),
 	}
 }
 
@@ -1781,7 +1781,7 @@ func (p *accessListParser) parse(event backend.Event) (types.Resource, error) {
 
 func newAuditQueryParser() *auditQueryParser {
 	return &auditQueryParser{
-		baseParser: newBaseParser(backend.NewKey(AuditQueryPrefix)),
+		baseParser: newBaseParser(AuditQueryPrefix),
 	}
 }
 
@@ -1804,7 +1804,7 @@ func (p *auditQueryParser) parse(event backend.Event) (types.Resource, error) {
 
 func newSecurityReportParser() *securityReportParser {
 	return &securityReportParser{
-		baseParser: newBaseParser(backend.NewKey(SecurityReportPrefix)),
+		baseParser: newBaseParser(SecurityReportPrefix),
 	}
 }
 
@@ -1827,7 +1827,7 @@ func (p *securityReportParser) parse(event backend.Event) (types.Resource, error
 
 func newSecurityReportStateParser() *securityReportStateParser {
 	return &securityReportStateParser{
-		baseParser: newBaseParser(backend.NewKey(SecurityReportStatePrefix)),
+		baseParser: newBaseParser(SecurityReportStatePrefix),
 	}
 }
 
@@ -1850,7 +1850,7 @@ func (p *securityReportStateParser) parse(event backend.Event) (types.Resource, 
 
 func newUserLoginStateParser() *userLoginStateParser {
 	return &userLoginStateParser{
-		baseParser: newBaseParser(backend.NewKey(userLoginStatePrefix)),
+		baseParser: newBaseParser(userLoginStatePrefix),
 	}
 }
 
@@ -1874,7 +1874,7 @@ func (p *userLoginStateParser) parse(event backend.Event) (types.Resource, error
 
 func newAccessListMemberParser() *accessListMemberParser {
 	return &accessListMemberParser{
-		baseParser: newBaseParser(backend.ExactKey(accessListMemberPrefix)),
+		baseParser: newBaseParser(accessListMemberPrefix.ExactKey()),
 	}
 }
 
@@ -1910,7 +1910,7 @@ func (p *accessListMemberParser) parse(event backend.Event) (types.Resource, err
 
 func newAccessListReviewParser() *accessListReviewParser {
 	return &accessListReviewParser{
-		baseParser: newBaseParser(backend.ExactKey(accessListReviewPrefix)),
+		baseParser: newBaseParser(accessListReviewPrefix.ExactKey()),
 	}
 }
 
@@ -1946,7 +1946,7 @@ func (p *accessListReviewParser) parse(event backend.Event) (types.Resource, err
 
 func newKubeWaitingContainerParser() *kubeWaitingContainerParser {
 	return &kubeWaitingContainerParser{
-		baseParser: newBaseParser(backend.NewKey(kubeWaitingContPrefix)),
+		baseParser: newBaseParser(kubeWaitingContPrefix),
 	}
 }
 
@@ -1995,7 +1995,7 @@ func (p *kubeWaitingContainerParser) parse(event backend.Event) (types.Resource,
 
 func newAccessMonitoringRuleParser() *AccessMonitoringRuleParser {
 	return &AccessMonitoringRuleParser{
-		baseParser: newBaseParser(backend.ExactKey(accessMonitoringRulesPrefix)),
+		baseParser: newBaseParser(accessMonitoringRulesPrefix.ExactKey()),
 	}
 }
 
@@ -2023,7 +2023,7 @@ func (p *AccessMonitoringRuleParser) parse(event backend.Event) (types.Resource,
 
 func newUserNotificationParser() *userNotificationParser {
 	return &userNotificationParser{
-		baseParser: newBaseParser(backend.NewKey(notificationsUserSpecificPrefix)),
+		baseParser: newBaseParser(notificationsUserSpecificPrefix.ExactKey()),
 	}
 }
 
@@ -2067,7 +2067,7 @@ func (p *userNotificationParser) parse(event backend.Event) (types.Resource, err
 
 func newGlobalNotificationParser() *globalNotificationParser {
 	return &globalNotificationParser{
-		baseParser: newBaseParser(backend.NewKey(notificationsGlobalPrefix)),
+		baseParser: newBaseParser(notificationsGlobalPrefix.ExactKey()),
 	}
 }
 
@@ -2183,7 +2183,7 @@ func (p *instanceParser) parse(event backend.Event) (types.Resource, error) {
 
 func newStaticHostUserParser() *staticHostUserParser {
 	return &staticHostUserParser{
-		baseParser: newBaseParser(backend.NewKey(staticHostUserPrefix)),
+		baseParser: newBaseParser(staticHostUserPrefix),
 	}
 }
 
@@ -2323,7 +2323,7 @@ func (p *deviceParser) parse(event backend.Event) (types.Resource, error) {
 
 func newAccessGraphSecretPrivateKeyParser() *accessGraphSecretPrivateKeyParser {
 	return &accessGraphSecretPrivateKeyParser{
-		baseParser: newBaseParser(backend.NewKey(privateKeysPrefix)),
+		baseParser: newBaseParser(privateKeysPrefix.ExactKey()),
 	}
 }
 
@@ -2367,7 +2367,7 @@ func (p *accessGraphSecretPrivateKeyParser) parse(event backend.Event) (types.Re
 
 func newAccessGraphSecretAuthorizedKeyParser() *accessGraphSecretAuthorizedKeyParser {
 	return &accessGraphSecretAuthorizedKeyParser{
-		baseParser: newBaseParser(backend.NewKey(authorizedKeysPrefix)),
+		baseParser: newBaseParser(authorizedKeysPrefix.ExactKey()),
 	}
 }
 
@@ -2481,7 +2481,7 @@ func (p *accessGraphSettingsParser) parse(event backend.Event) (types.Resource, 
 
 func newSPIFFEFederationParser() *spiffeFederationParser {
 	return &spiffeFederationParser{
-		baseParser: newBaseParser(backend.NewKey(spiffeFederationPrefix)),
+		baseParser: newBaseParser(spiffeFederationPrefix),
 	}
 }
 

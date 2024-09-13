@@ -296,6 +296,12 @@ func TestKeyHasPrefix(t *testing.T) {
 			prefix:    backend.NewKey("a"),
 			assertion: assert.False,
 		},
+		{
+			name:      "range key",
+			key:       backend.NewKey("web", "users", "alice", "params"),
+			prefix:    backend.ExactKey("web", "users"),
+			assertion: assert.True,
+		},
 	}
 
 	for _, test := range tests {
@@ -431,7 +437,7 @@ func TestKeyPrependPrefix(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			prefixed := test.key.PrependPrefix(test.prefix)
+			prefixed := test.key.PrependKey(test.prefix)
 			assert.Equal(t, test.expected, prefixed)
 		})
 	}
@@ -511,6 +517,12 @@ func TestKeyCompare(t *testing.T) {
 			key:      backend.NewKey("123", "prefiy"),
 			other:    backend.NewKey("123", "prefix", "a"),
 			expected: 1,
+		},
+		{
+			name:     "special characters",
+			key:      backend.NewKey("fish+"),
+			other:    backend.NewKey("fish"),
+			expected: -1,
 		},
 	}
 	for _, test := range tests {

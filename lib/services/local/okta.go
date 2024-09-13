@@ -34,10 +34,13 @@ import (
 	"github.com/gravitational/teleport/lib/utils"
 )
 
+var (
+	oktaImportRulePrefix = backend.NewKey("okta_import_rule")
+	oktaAssignmentPrefix = backend.NewKey("okta_assignment")
+)
+
 const (
-	oktaImportRulePrefix      = "okta_import_rule"
 	oktaImportRuleMaxPageSize = 200
-	oktaAssignmentPrefix      = "okta_assignment"
 	oktaAssignmentMaxPageSize = 200
 )
 

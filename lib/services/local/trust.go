@@ -759,7 +759,7 @@ func (s *CA) GetRemoteClusters(ctx context.Context) ([]types.RemoteCluster, erro
 func (s *CA) ListRemoteClusters(
 	ctx context.Context, pageSize int, pageToken string,
 ) ([]types.RemoteCluster, string, error) {
-	rangeStart := backend.NewKey(remoteClustersPrefix, pageToken)
+	rangeStart := backend.NewKey(remoteClustersPrefix).AppendKey(backend.KeyFromString(pageToken))
 	rangeEnd := backend.RangeEnd(backend.ExactKey(remoteClustersPrefix))
 
 	// Adjust page size, so it can't be too large.

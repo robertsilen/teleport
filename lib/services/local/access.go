@@ -361,7 +361,7 @@ func (s *AccessService) ReplaceRemoteLocks(ctx context.Context, clusterName stri
 	return backend.RunWhileLocked(ctx, backend.RunWhileLockedConfig{
 		LockConfiguration: backend.LockConfiguration{
 			Backend:  s.Backend,
-			LockName: "ReplaceRemoteLocks/" + clusterName,
+			LockName: backend.NewKey("ReplaceRemoteLocks" + clusterName),
 			TTL:      time.Minute,
 		},
 	}, func(ctx context.Context) error {

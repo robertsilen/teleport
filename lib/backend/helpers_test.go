@@ -39,12 +39,12 @@ func TestLockConfiguration_CheckAndSetDefaults(t *testing.T) {
 			name: "minimum valid",
 			in: LockConfiguration{
 				Backend:  mockBackend{},
-				LockName: "lock",
+				LockName: NewKey("lock"),
 				TTL:      30 * time.Second,
 			},
 			want: LockConfiguration{
 				Backend:       mockBackend{},
-				LockName:      "lock",
+				LockName:      NewKey("lock"),
 				TTL:           30 * time.Second,
 				RetryInterval: 250 * time.Millisecond,
 			},
@@ -53,13 +53,13 @@ func TestLockConfiguration_CheckAndSetDefaults(t *testing.T) {
 			name: "set RetryAcquireLockTimeout",
 			in: LockConfiguration{
 				Backend:       mockBackend{},
-				LockName:      "lock",
+				LockName:      NewKey("lock"),
 				TTL:           30 * time.Second,
 				RetryInterval: 10 * time.Second,
 			},
 			want: LockConfiguration{
 				Backend:       mockBackend{},
-				LockName:      "lock",
+				LockName:      NewKey("lock"),
 				TTL:           30 * time.Second,
 				RetryInterval: 10 * time.Second,
 			},
@@ -74,8 +74,7 @@ func TestLockConfiguration_CheckAndSetDefaults(t *testing.T) {
 		{
 			name: "missing lock name",
 			in: LockConfiguration{
-				Backend:  mockBackend{},
-				LockName: "",
+				Backend: mockBackend{},
 			},
 			wantErr: "missing LockName",
 		},
@@ -83,7 +82,7 @@ func TestLockConfiguration_CheckAndSetDefaults(t *testing.T) {
 			name: "missing TTL",
 			in: LockConfiguration{
 				Backend:  mockBackend{},
-				LockName: "lock",
+				LockName: NewKey("lock"),
 				TTL:      0,
 			},
 			wantErr: "missing TTL",
@@ -107,7 +106,7 @@ func TestRunWhileLockedConfigCheckAndSetDefaults(t *testing.T) {
 	type mockBackend struct {
 		Backend
 	}
-	lockName := "lock"
+	lockName := NewKey("lock")
 	ttl := 1 * time.Minute
 	minimumValidConfig := RunWhileLockedConfig{
 		LockConfiguration: LockConfiguration{
@@ -143,7 +142,6 @@ func TestRunWhileLockedConfigCheckAndSetDefaults(t *testing.T) {
 			name: "errors from LockConfiguration is passed",
 			input: func() RunWhileLockedConfig {
 				cfg := minimumValidConfig
-				cfg.LockName = ""
 				return cfg
 			},
 			wantErr: "missing LockName",

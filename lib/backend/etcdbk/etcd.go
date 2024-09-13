@@ -870,7 +870,7 @@ func (b *EtcdBackend) KeepAlive(ctx context.Context, lease backend.Lease, expire
 	_, err := b.clients.Next().Put(ctx, b.prependPrefix(lease.Key), "", opts...)
 	err = convertErr(err)
 	if trace.IsNotFound(err) {
-		return trace.NotFound("item %q is not found", lease.Key)
+		return trace.NotFound("item %v is not found", lease.Key)
 	}
 
 	return err
@@ -1111,5 +1111,5 @@ func (b *EtcdBackend) trimPrefix(in backend.Key) backend.Key {
 }
 
 func (b *EtcdBackend) prependPrefix(in backend.Key) string {
-	return in.PrependPrefix(backend.KeyFromString(b.cfg.Key)).String()
+	return in.PrependKey(backend.KeyFromString(b.cfg.Key)).String()
 }

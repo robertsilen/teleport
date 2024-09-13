@@ -406,7 +406,7 @@ func TestAccessListDedupeOwnersBackwardsCompat(t *testing.T) {
 	accessListDuplicateOwners.Spec.Owners = append(accessListDuplicateOwners.Spec.Owners, accessListDuplicateOwners.Spec.Owners[0])
 	require.Len(t, accessListDuplicateOwners.Spec.Owners, 3)
 
-	item, err := service.service.MakeBackendItem(accessListDuplicateOwners, accessListDuplicateOwners.GetName())
+	item, err := service.service.MakeBackendItem(accessListDuplicateOwners, backend.NewKey(accessListDuplicateOwners.GetName()))
 	require.NoError(t, err)
 	_, err = mem.Put(ctx, item)
 	require.NoError(t, err)

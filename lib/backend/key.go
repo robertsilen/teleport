@@ -38,6 +38,10 @@ func NewKey(parts ...string) Key {
 
 // KeyFromString creates a Key from its textual representation.
 func KeyFromString(key string) Key {
+	if key == "" {
+		return Key{}
+	}
+
 	k := strings.Split(key, Separator)
 	if k[0] == "" && string(key[0]) == Separator {
 		return k[1:]
@@ -69,7 +73,17 @@ func (k Key) HasPrefix(prefix Key) bool {
 		return true
 	}
 
-	n := min(len(k), len(prefix))
+	prefixLen := len(prefix)
+	if prefix.isExactKey() {
+		prefixLen--
+	}
+
+	kLen := len(k)
+	if k.isExactKey() {
+		kLen--
+	}
+
+	n := min(kLen, prefixLen)
 
 	for i := 0; i < n; i++ {
 		if k[i] != prefix[i] {
@@ -77,7 +91,7 @@ func (k Key) HasPrefix(prefix Key) bool {
 		}
 	}
 
-	return len(prefix) <= len(k)
+	return prefixLen <= kLen
 }
 
 // TrimPrefix returns the key without the provided leading prefix string.
@@ -107,8 +121,24 @@ func (k Key) TrimPrefix(prefix Key) Key {
 	}
 }
 
-func (k Key) PrependPrefix(p Key) Key {
+func (k Key) PrependKey(p Key) Key {
 	return append(slices.Clone(p), slices.Clone(k)...)
+}
+
+func (k Key) AppendKey(p Key) Key {
+	return append(slices.Clone(k), slices.Clone(p)...)
+}
+
+func (k Key) ExactKey() Key {
+	if k[len(k)-1] != "" {
+		return ExactKey(k...)
+	}
+
+	return k
+}
+
+func (k Key) isExactKey() bool {
+	return len(k) > 1 && k[len(k)-1] == ""
 }
 
 // HasSuffix reports whether the key ends with suffix.

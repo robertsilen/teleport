@@ -30,9 +30,7 @@ import (
 	"github.com/gravitational/teleport/lib/services/local/generic"
 )
 
-const (
-	kubeWaitingContPrefix = "k8s_waiting_container"
-)
+var kubeWaitingContPrefix = backend.NewKey("k8s_waiting_container")
 
 // KubeWaitingContainerService manages Kubernetes ephemeral containers
 // that are waiting to be created until moderated session conditions are met.

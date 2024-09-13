@@ -20,7 +20,6 @@ package local
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -42,24 +41,27 @@ import (
 	"github.com/gravitational/teleport/lib/utils"
 )
 
+var (
+	accessListPrefix       = backend.NewKey("access_list")
+	accessListMemberPrefix = backend.NewKey("access_list_member")
+	accessListReviewPrefix = backend.NewKey("access_list_review")
+)
+
 const (
-	accessListPrefix      = "access_list"
-	accessListMaxPageSize = 100
-
-	accessListMemberPrefix      = "access_list_member"
+	accessListMaxPageSize       = 100
 	accessListMemberMaxPageSize = 200
-
-	accessListReviewPrefix      = "access_list_review"
 	accessListReviewMaxPageSize = 200
 
 	// This lock is necessary to prevent a race condition between access lists and members and to ensure
 	// consistency of the one-to-many relationship between them.
 	accessListLockTTL = 5 * time.Second
+)
 
+var (
 	// createAccessListLimitLockName is the lock used to prevent simultaneous
 	// creation or update of AccessLists in order to enforce the license limit
 	// on the number AccessLists in a cluster.
-	createAccessListLimitLockName = "createAccessListLimitLock"
+	createAccessListLimitLockName = backend.NewKey("createAccessListLimitLock")
 )
 
 // AccessListService manages Access List resources in the Backend. The AccessListService's
@@ -147,7 +149,7 @@ func (a *AccessListService) ListAccessLists(ctx context.Context, pageSize int, n
 // GetAccessList returns the specified access list resource.
 func (a *AccessListService) GetAccessList(ctx context.Context, name string) (*accesslist.AccessList, error) {
 	var accessList *accesslist.AccessList
-	err := a.service.RunWhileLocked(ctx, lockName(name), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(name), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		var err error
 		accessList, err = a.service.GetResource(ctx, name)
 		return trace.Wrap(err)
@@ -182,7 +184,7 @@ func (a *AccessListService) runOpWithLock(ctx context.Context, accessList *acces
 	var upserted *accesslist.AccessList
 
 	updateAccessList := func() error {
-		return a.service.RunWhileLocked(ctx, lockName(accessList.GetName()), accessListLockTTL,
+		return a.service.RunWhileLocked(ctx, lockKey(accessList.GetName()), accessListLockTTL,
 			func(ctx context.Context, _ backend.Backend) error {
 				var err error
 				upserted, err = op(ctx, accessList)
@@ -218,7 +220,7 @@ func (a *AccessListService) runOpWithLock(ctx context.Context, accessList *acces
 
 // DeleteAccessList removes the specified access list resource.
 func (a *AccessListService) DeleteAccessList(ctx context.Context, name string) error {
-	err := a.service.RunWhileLocked(ctx, lockName(name), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(name), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		// Delete all associated members.
 		err := a.memberService.WithPrefix(name).DeleteAllResources(ctx)
 		if err != nil {
@@ -251,7 +253,7 @@ func (a *AccessListService) GetSuggestedAccessLists(ctx context.Context, accessR
 // CountAccessListMembers will count all access list members.
 func (a *AccessListService) CountAccessListMembers(ctx context.Context, accessListName string) (uint32, error) {
 	count := uint(0)
-	err := a.service.RunWhileLocked(ctx, lockName(accessListName), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(accessListName), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		var err error
 		count, err = a.memberService.WithPrefix(accessListName).CountResources(ctx)
 		return trace.Wrap(err)
@@ -263,7 +265,7 @@ func (a *AccessListService) CountAccessListMembers(ctx context.Context, accessLi
 // ListAccessListMembers returns a paginated list of all access list members.
 func (a *AccessListService) ListAccessListMembers(ctx context.Context, accessListName string, pageSize int, nextToken string) ([]*accesslist.AccessListMember, string, error) {
 	var members []*accesslist.AccessListMember
-	err := a.service.RunWhileLocked(ctx, lockName(accessListName), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(accessListName), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		_, err := a.service.GetResource(ctx, accessListName)
 		if err != nil {
 			return trace.Wrap(err)
@@ -293,7 +295,7 @@ func (a *AccessListService) ListAllAccessListMembers(ctx context.Context, pageSi
 // GetAccessListMember returns the specified access list member resource.
 func (a *AccessListService) GetAccessListMember(ctx context.Context, accessList string, memberName string) (*accesslist.AccessListMember, error) {
 	var member *accesslist.AccessListMember
-	err := a.service.RunWhileLocked(ctx, lockName(accessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(accessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		_, err := a.service.GetResource(ctx, accessList)
 		if err != nil {
 			return trace.Wrap(err)
@@ -307,7 +309,7 @@ func (a *AccessListService) GetAccessListMember(ctx context.Context, accessList 
 // UpsertAccessListMember creates or updates an access list member resource.
 func (a *AccessListService) UpsertAccessListMember(ctx context.Context, member *accesslist.AccessListMember) (*accesslist.AccessListMember, error) {
 	var upserted *accesslist.AccessListMember
-	err := a.service.RunWhileLocked(ctx, lockName(member.Spec.AccessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(member.Spec.AccessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		_, err := a.service.GetResource(ctx, member.Spec.AccessList)
 		if err != nil {
 			return trace.Wrap(err)
@@ -324,7 +326,7 @@ func (a *AccessListService) UpsertAccessListMember(ctx context.Context, member *
 // UpdateAccessListMember conditionally updates an access list member resource.
 func (a *AccessListService) UpdateAccessListMember(ctx context.Context, member *accesslist.AccessListMember) (*accesslist.AccessListMember, error) {
 	var updated *accesslist.AccessListMember
-	err := a.service.RunWhileLocked(ctx, lockName(member.Spec.AccessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(member.Spec.AccessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		_, err := a.service.GetResource(ctx, member.Spec.AccessList)
 		if err != nil {
 			return trace.Wrap(err)
@@ -340,7 +342,7 @@ func (a *AccessListService) UpdateAccessListMember(ctx context.Context, member *
 
 // DeleteAccessListMember hard deletes the specified access list member resource.
 func (a *AccessListService) DeleteAccessListMember(ctx context.Context, accessList string, memberName string) error {
-	err := a.service.RunWhileLocked(ctx, lockName(accessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(accessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		_, err := a.service.GetResource(ctx, accessList)
 		if err != nil {
 			return trace.Wrap(err)
@@ -356,7 +358,7 @@ func (a *AccessListService) DeleteAccessListMember(ctx context.Context, accessLi
 // mechanism for cleaning out the user list if a list is converted from explicit
 // to implicit.
 func (a *AccessListService) DeleteAllAccessListMembersForAccessList(ctx context.Context, accessList string) error {
-	err := a.service.RunWhileLocked(ctx, lockName(accessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(accessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		_, err := a.service.GetResource(ctx, accessList)
 		if err != nil {
 			return trace.Wrap(err)
@@ -386,7 +388,7 @@ func (a *AccessListService) UpsertAccessListWithMembers(ctx context.Context, acc
 	}
 
 	reconcileMembers := func() error {
-		return a.service.RunWhileLocked(ctx, lockName(accessList.GetName()), 2*accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+		return a.service.RunWhileLocked(ctx, lockKey(accessList.GetName()), 2*accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 			// Convert the members slice to a map for easier lookup.
 			membersMap := utils.FromSlice(membersIn, types.GetName)
 
@@ -489,7 +491,7 @@ func (a *AccessListService) AccessRequestPromote(_ context.Context, _ *accesslis
 
 // ListAccessListReviews will list access list reviews for a particular access list.
 func (a *AccessListService) ListAccessListReviews(ctx context.Context, accessList string, pageSize int, pageToken string) (reviews []*accesslist.Review, nextToken string, err error) {
-	err = a.service.RunWhileLocked(ctx, lockName(accessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err = a.service.RunWhileLocked(ctx, lockKey(accessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		_, err := a.service.GetResource(ctx, accessList)
 		if err != nil {
 			return trace.Wrap(err)
@@ -537,7 +539,7 @@ func (a *AccessListService) CreateAccessListReview(ctx context.Context, review *
 
 	var nextAuditDate time.Time
 
-	err = a.service.RunWhileLocked(ctx, lockName(review.Spec.AccessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err = a.service.RunWhileLocked(ctx, lockKey(review.Spec.AccessList), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		accessList, err := a.service.GetResource(ctx, review.Spec.AccessList)
 		if err != nil {
 			return trace.Wrap(err)
@@ -634,7 +636,7 @@ func accessListRequiresEqual(a, b accesslist.Requires) bool {
 
 // DeleteAccessListReview will delete an access list review from the backend.
 func (a *AccessListService) DeleteAccessListReview(ctx context.Context, accessListName, reviewName string) error {
-	err := a.service.RunWhileLocked(ctx, lockName(accessListName), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
+	err := a.service.RunWhileLocked(ctx, lockKey(accessListName), accessListLockTTL, func(ctx context.Context, _ backend.Backend) error {
 		_, err := a.service.GetResource(ctx, accessListName)
 		if err != nil {
 			return trace.Wrap(err)
@@ -651,8 +653,8 @@ func (a *AccessListService) DeleteAllAccessListReviews(ctx context.Context) erro
 	return trace.Wrap(a.reviewService.DeleteAllResources(ctx))
 }
 
-func lockName(accessListName string) string {
-	return strings.Join([]string{"access_list", accessListName}, string(backend.Separator))
+func lockKey(accessListName string) backend.Key {
+	return backend.NewKey("access_list", accessListName)
 }
 
 // VerifyAccessListCreateLimit ensures creating access list is limited to no more than 1 (updating is allowed).

@@ -36,6 +36,11 @@ const (
 	autoUpdateVersionPrefix = "auto_update_version"
 )
 
+var (
+	autoUpdateConfigKey = backend.NewKey(types.MetaNameAutoUpdateConfig)
+	autoUpdateVersion   = backend.NewKey(types.MetaNameAutoUpdateVersion)
+)
+
 // AutoupdateService is responsible for managing auto update configuration and version.
 type AutoupdateService struct {
 	config  *generic.ServiceWrapper[*autoupdate.AutoUpdateConfig]
@@ -43,17 +48,17 @@ type AutoupdateService struct {
 }
 
 // NewAutoupdateService returns a new AutoupdateService.
-func NewAutoupdateService(backend backend.Backend) (*AutoupdateService, error) {
+func NewAutoupdateService(b backend.Backend) (*AutoupdateService, error) {
 	config, err := generic.NewServiceWrapper(
 		generic.ServiceWrapperConfig[*autoupdate.AutoUpdateConfig]{
-			Backend:       backend,
+			Backend:       b,
 			ResourceKind:  types.KindAutoUpdateConfig,
-			BackendPrefix: autoUpdateConfigPrefix,
+			BackendPrefix: backend.NewKey(autoUpdateConfigPrefix),
 			MarshalFunc:   services.MarshalProtoResource[*autoupdate.AutoUpdateConfig],
 			UnmarshalFunc: services.UnmarshalProtoResource[*autoupdate.AutoUpdateConfig],
 			ValidateFunc:  update.ValidateAutoUpdateConfig,
-			KeyFunc: func(*autoupdate.AutoUpdateConfig) string {
-				return types.MetaNameAutoUpdateConfig
+			KeyFunc: func(*autoupdate.AutoUpdateConfig) backend.Key {
+				return autoUpdateConfigKey
 			},
 		})
 	if err != nil {
@@ -61,14 +66,14 @@ func NewAutoupdateService(backend backend.Backend) (*AutoupdateService, error) {
 	}
 	version, err := generic.NewServiceWrapper(
 		generic.ServiceWrapperConfig[*autoupdate.AutoUpdateVersion]{
-			Backend:       backend,
+			Backend:       b,
 			ResourceKind:  types.KindAutoUpdateVersion,
-			BackendPrefix: autoUpdateVersionPrefix,
+			BackendPrefix: backend.NewKey(autoUpdateVersionPrefix),
 			MarshalFunc:   services.MarshalProtoResource[*autoupdate.AutoUpdateVersion],
 			UnmarshalFunc: services.UnmarshalProtoResource[*autoupdate.AutoUpdateVersion],
 			ValidateFunc:  update.ValidateAutoUpdateVersion,
-			KeyFunc: func(version *autoupdate.AutoUpdateVersion) string {
-				return types.MetaNameAutoUpdateVersion
+			KeyFunc: func(version *autoupdate.AutoUpdateVersion) backend.Key {
+				return autoUpdateVersion
 			},
 		})
 	if err != nil {

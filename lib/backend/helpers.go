@@ -28,12 +28,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const (
-	locksPrefix = ".locks"
+var (
+	locksPrefix = NewKey(".locks")
 )
 
-func lockKey(parts ...string) Key {
-	return NewKey(append([]string{locksPrefix}, parts...)...)
+func lockKey(k Key) Key {
+	return k.PrependKey(locksPrefix)
 }
 
 type Lock struct {
@@ -53,7 +53,7 @@ func randomID() ([]byte, error) {
 
 type LockConfiguration struct {
 	Backend  Backend
-	LockName string
+	LockName Key
 	// TTL defines when lock will be released automatically
 	TTL time.Duration
 	// RetryInterval defines interval which is used to retry locking after
@@ -65,7 +65,7 @@ func (l *LockConfiguration) CheckAndSetDefaults() error {
 	if l.Backend == nil {
 		return trace.BadParameter("missing Backend")
 	}
-	if l.LockName == "" {
+	if len(l.LockName) == 0 {
 		return trace.BadParameter("missing LockName")
 	}
 	if l.TTL == 0 {

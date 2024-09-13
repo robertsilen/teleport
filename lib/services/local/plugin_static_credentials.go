@@ -29,9 +29,7 @@ import (
 	"github.com/gravitational/teleport/lib/services/local/generic"
 )
 
-const (
-	pluginStaticCredentialsPrefix = "plugin_static_credentials"
-)
+var pluginStaticCredentialsPrefix = backend.NewKey("plugin_static_credentials")
 
 // PluginStaticCredentialsService manages plugin static credentials in the Backend.
 type PluginStaticCredentialsService struct {

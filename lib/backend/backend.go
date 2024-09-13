@@ -363,7 +363,7 @@ func GetPaginationKey(ki KeyedItem) string {
 		return NewKey(h.GetHostID(), h.GetName()).String()
 	}
 
-	return ki.GetName()
+	return NewKey(ki.GetName()).String()
 }
 
 // MaskKeyName masks the given key name.

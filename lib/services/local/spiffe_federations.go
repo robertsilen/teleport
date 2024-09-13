@@ -28,8 +28,8 @@ import (
 	"github.com/gravitational/teleport/lib/services/local/generic"
 )
 
-const (
-	spiffeFederationPrefix = "spiffe_federation"
+var (
+	spiffeFederationPrefix = backend.NewKey("spiffe_federation")
 )
 
 // SPIFFEFederationService exposes backend functionality for storing
