@@ -948,43 +948,7 @@ func New(config Config) (*Cache, error) {
 		return nil, trace.Wrap(err)
 	}
 
-	usersCache, err := local.NewIdentityServiceV2(config.Backend)
-	if err != nil {
-		cancel()
-		return nil, trace.Wrap(err)
-	}
-
-	appSessionCache, err := local.NewIdentityServiceV2(config.Backend)
-	if err != nil {
-		cancel()
-		return nil, trace.Wrap(err)
-	}
-
-	snowflakeSessionCache, err := local.NewIdentityServiceV2(config.Backend)
-	if err != nil {
-		cancel()
-		return nil, trace.Wrap(err)
-	}
-
-	samlIdPSessionCache, err := local.NewIdentityServiceV2(config.Backend)
-	if err != nil {
-		cancel()
-		return nil, trace.Wrap(err)
-	}
-
-	headlessAuthenticationsCache, err := local.NewIdentityServiceV2(config.Backend)
-	if err != nil {
-		cancel()
-		return nil, trace.Wrap(err)
-	}
-
-	webSessionCache, err := local.NewIdentityServiceV2(config.Backend)
-	if err != nil {
-		cancel()
-		return nil, trace.Wrap(err)
-	}
-
-	webTokenCache, err := local.NewIdentityServiceV2(config.Backend)
+	identityService, err := local.NewIdentityServiceV2(config.Backend)
 	if err != nil {
 		cancel()
 		return nil, trace.Wrap(err)
@@ -999,7 +963,7 @@ func New(config Config) (*Cache, error) {
 		trustCache:                   local.NewCAService(config.Backend),
 		clusterConfigCache:           clusterConfigCache,
 		provisionerCache:             local.NewProvisioningService(config.Backend),
-		usersCache:                   usersCache,
+		usersCache:                   identityService,
 		accessCache:                  local.NewAccessService(config.Backend),
 		dynamicAccessCache:           local.NewDynamicAccessService(config.Backend),
 		presenceCache:                local.NewPresenceService(config.Backend),
@@ -1009,11 +973,11 @@ func New(config Config) (*Cache, error) {
 		crownJewelsCache:             crownJewelCache,
 		databaseServicesCache:        local.NewDatabaseServicesService(config.Backend),
 		databasesCache:               local.NewDatabasesService(config.Backend),
-		appSessionCache:              appSessionCache,
-		snowflakeSessionCache:        snowflakeSessionCache,
-		samlIdPSessionCache:          samlIdPSessionCache,
-		webSessionCache:              webSessionCache.WebSessions(),
-		webTokenCache:                webTokenCache.WebTokens(),
+		appSessionCache:              identityService,
+		snowflakeSessionCache:        identityService,
+		samlIdPSessionCache:          identityService,
+		webSessionCache:              identityService.WebSessions(),
+		webTokenCache:                identityService.WebTokens(),
 		windowsDesktopsCache:         local.NewWindowsDesktopService(config.Backend),
 		accessMontoringRuleCache:     accessMonitoringRuleCache,
 		samlIdPServiceProvidersCache: samlIdPServiceProvidersCache,
@@ -1021,7 +985,7 @@ func New(config Config) (*Cache, error) {
 		oktaCache:                    oktaCache,
 		integrationsCache:            integrationsCache,
 		discoveryConfigsCache:        discoveryConfigsCache,
-		headlessAuthenticationsCache: headlessAuthenticationsCache,
+		headlessAuthenticationsCache: identityService,
 		secReportsCache:              secReportsCache,
 		userLoginStateCache:          userLoginStatesCache,
 		accessListCache:              accessListCache,

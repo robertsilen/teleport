@@ -1347,12 +1347,6 @@ func (a *Server) runPeriodicOperations() {
 	})
 	defer dynamicLabelsCheck.Stop()
 
-	notificationsCleanup := interval.New(interval.Config{
-		Duration:      48 * time.Hour,
-		FirstDuration: utils.FullJitter(time.Hour),
-		Jitter:        retryutils.NewSeventhJitter(),
-	})
-
 	// isolate the schedule of potentially long-running refreshRemoteClusters() from other tasks
 	go func() {
 		// reasonably small interval to ensure that users observe clusters as online within 1 minute of adding them.
@@ -1368,6 +1362,25 @@ func (a *Server) runPeriodicOperations() {
 				return
 			case <-remoteClustersRefresh.Next():
 				a.refreshRemoteClusters(ctx, r)
+			}
+		}
+	}()
+
+	// Create a separate goroutine for notifications cleanup.
+	go func() {
+		notificationsCleanup := interval.New(interval.Config{
+			Duration:      48 * time.Hour,
+			FirstDuration: utils.FullJitter(time.Hour),
+			Jitter:        retryutils.NewSeventhJitter(),
+		})
+		defer notificationsCleanup.Stop()
+
+		for {
+			select {
+			case <-a.closeCtx.Done():
+				return
+			case <-notificationsCleanup.Next():
+				a.CleanupNotifications(ctx)
 			}
 		}
 	}()
@@ -1425,8 +1438,6 @@ func (a *Server) runPeriodicOperations() {
 			a.syncDesktopsLimitAlert(ctx)
 		case <-dynamicLabelsCheck.Next():
 			a.syncDynamicLabelsAlert(ctx)
-		case <-notificationsCleanup.Next():
-			a.cleanupNotifications(ctx)
 		}
 	}
 }
@@ -5774,7 +5785,7 @@ func (a *Server) syncDynamicLabelsAlert(ctx context.Context) {
 	}
 }
 
-func (a *Server) cleanupNotifications(ctx context.Context) {
+func (a *Server) CleanupNotifications(ctx context.Context) {
 	var userNotifications []*notificationsv1.Notification
 	var userNotificationsPageKey string
 	userNotificationsReadLimiter := time.NewTicker(notificationsPageReadInterval)
@@ -5817,7 +5828,7 @@ func (a *Server) cleanupNotifications(ctx context.Context) {
 		globalNotificationsPageKey = nextKey
 	}
 
-	timeNow := time.Now()
+	timeNow := a.clock.Now()
 
 	notificationsDeleteLimiter := time.NewTicker(notificationsWriteInterval)
 	defer notificationsDeleteLimiter.Stop()
@@ -5891,6 +5902,7 @@ func (a *Server) cleanupNotifications(ctx context.Context) {
 		// If this notification state is for a notification which doesn't exist in either the non-expired global notifications map or
 		// the non-expired user notifications map, then delete it.
 		if nonExpiredGlobalNotificationsByID[id] == nil && nonExpiredUserNotificationsByID[id] == nil {
+			fmt.Printf("\n\nTHIS IS RUN\n\n")
 			select {
 			case <-notificationsDeleteLimiter.C:
 			case <-ctx.Done():

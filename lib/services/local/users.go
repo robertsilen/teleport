@@ -715,10 +715,8 @@ func (s *IdentityService) DeleteUser(ctx context.Context, user string) error {
 	if err := s.notificationsSvc.DeleteAllUserNotificationStatesForUser(ctx, user); err != nil {
 		notifErrors = append(notifErrors, trace.Wrap(err, "failed to delete notification states for user %s", user))
 	}
-	if len(notifErrors) > 0 {
-		return trace.NewAggregate(notifErrors...)
-	}
-	return nil
+
+	return trace.NewAggregate(notifErrors...)
 }
 
 func (s *IdentityService) upsertPasswordHash(username string, hash []byte) error {
