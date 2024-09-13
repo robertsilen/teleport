@@ -4290,17 +4290,17 @@ func TestCleanupNotifications(t *testing.T) {
 	}
 	var createdNotifications []notificationInfo
 
-	createNotifications := func(username string, count int, expiryMinutes int) {
+	createNotifications := func(username string, count int, expiryDuration time.Duration) {
 		for i := 0; i < count; i++ {
 			var id string
 			if username != "" {
-				notification := newUserNotificationWithExpiry(t, username, fmt.Sprintf("%s-notification-%d", username, i+1), timestamppb.New(fakeClock.Now().Add(time.Duration(expiryMinutes)*time.Minute)))
+				notification := newUserNotificationWithExpiry(t, username, fmt.Sprintf("%s-notification-%d", username, i+1), timestamppb.New(fakeClock.Now().Add(expiryDuration)))
 				created, err := srv.Auth().CreateUserNotification(ctx, notification)
 				require.NoError(t, err)
 				id = created.GetMetadata().GetName()
 				createdNotifications = append(createdNotifications, notificationInfo{id: id, username: username, isGlobal: false})
 			} else {
-				notification := newGlobalNotificationWithExpiry(t, fmt.Sprintf("global-notification-%d", i+1), timestamppb.New(fakeClock.Now().Add(time.Duration(expiryMinutes)*time.Minute)))
+				notification := newGlobalNotificationWithExpiry(t, fmt.Sprintf("global-notification-%d", i+1), timestamppb.New(fakeClock.Now().Add(expiryDuration)))
 				created, err := srv.Auth().CreateGlobalNotification(ctx, notification)
 				require.NoError(t, err)
 				id = created.GetMetadata().GetName()
@@ -4310,14 +4310,14 @@ func TestCleanupNotifications(t *testing.T) {
 	}
 
 	// Create user notifications
-	createNotifications("user1", 2, 5)  // 2 notifications for user1, expiring in 5 minutes
-	createNotifications("user1", 2, 10) // 2 notifications for user1, expiring in 10 minutes
-	createNotifications("user2", 2, 5)  // 2 notifications for user2, expiring in 5 minutes
-	createNotifications("user2", 2, 10) // 2 notifications for user2, expiring in 10 minutes
+	createNotifications("user1", 2, 5*time.Minute)  // 2 notifications for user1, expiring in 5 minutes
+	createNotifications("user1", 2, 10*time.Minute) // 2 notifications for user1, expiring in 10 minutes
+	createNotifications("user2", 2, 5*time.Minute)  // 2 notifications for user2, expiring in 5 minutes
+	createNotifications("user2", 2, 10*time.Minute) // 2 notifications for user2, expiring in 10 minutes
 
 	// Create global notifications
-	createNotifications("", 2, 5)  // 2 global notifications, expiring in 5 minutes
-	createNotifications("", 2, 10) // 2 global notifications, expiring in 10 minutes
+	createNotifications("", 2, 5*time.Minute)  // 2 global notifications, expiring in 5 minutes
+	createNotifications("", 2, 10*time.Minute) // 2 global notifications, expiring in 10 minutes
 
 	// Create notification states for all notifications
 	for _, notif := range createdNotifications {

@@ -1347,6 +1347,13 @@ func (a *Server) runPeriodicOperations() {
 	})
 	defer dynamicLabelsCheck.Stop()
 
+	notificationsCleanup := interval.New(interval.Config{
+		Duration:      48 * time.Hour,
+		FirstDuration: utils.FullJitter(time.Hour),
+		Jitter:        retryutils.NewSeventhJitter(),
+	})
+	defer notificationsCleanup.Stop()
+
 	// isolate the schedule of potentially long-running refreshRemoteClusters() from other tasks
 	go func() {
 		// reasonably small interval to ensure that users observe clusters as online within 1 minute of adding them.
@@ -1362,25 +1369,6 @@ func (a *Server) runPeriodicOperations() {
 				return
 			case <-remoteClustersRefresh.Next():
 				a.refreshRemoteClusters(ctx, r)
-			}
-		}
-	}()
-
-	// Create a separate goroutine for notifications cleanup.
-	go func() {
-		notificationsCleanup := interval.New(interval.Config{
-			Duration:      48 * time.Hour,
-			FirstDuration: utils.FullJitter(time.Hour),
-			Jitter:        retryutils.NewSeventhJitter(),
-		})
-		defer notificationsCleanup.Stop()
-
-		for {
-			select {
-			case <-a.closeCtx.Done():
-				return
-			case <-notificationsCleanup.Next():
-				a.CleanupNotifications(ctx)
 			}
 		}
 	}()
@@ -1438,6 +1426,8 @@ func (a *Server) runPeriodicOperations() {
 			a.syncDesktopsLimitAlert(ctx)
 		case <-dynamicLabelsCheck.Next():
 			a.syncDynamicLabelsAlert(ctx)
+		case <-notificationsCleanup.Next():
+			go a.CleanupNotifications(ctx)
 		}
 	}
 }
@@ -5785,6 +5775,7 @@ func (a *Server) syncDynamicLabelsAlert(ctx context.Context) {
 	}
 }
 
+// CleanupNotifications deletes all expired user notifications and global notifications, as well as any associated notification states, for all users.
 func (a *Server) CleanupNotifications(ctx context.Context) {
 	var userNotifications []*notificationsv1.Notification
 	var userNotificationsPageKey string
