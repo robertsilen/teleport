@@ -300,18 +300,43 @@ func getAccessListDynamicMembers(ctx context.Context, clt AccessListsAndMembersG
 	return dynamicMembers, nil
 }
 
+// getAccessListDynamicOwners returns a flat list of dynamic owner lists for the given access list.
+func getAccessListDynamicOwners(ctx context.Context, clt AccessListsAndMembersGetter, entry *accesslist.AccessList) ([]*accesslist.AccessList, error) {
+	var dynamicOwners []*accesslist.AccessList
+	seen := map[string]struct{}{}
+
+	for _, owner := range entry.GetOwners() {
+		if _, ok := seen[owner.Name]; ok || owner.MembershipKind != accesslist.MembershipKindList {
+			continue
+		}
+		seen[owner.Name] = struct{}{}
+
+		dynamicList, err := clt.GetAccessList(ctx, owner.Name)
+		if err != nil {
+			if trace.IsNotFound(err) {
+				continue
+			} else {
+				return nil, trace.Wrap(err)
+			}
+		}
+		dynamicOwners = append(dynamicOwners, dynamicList)
+		// check for further dynamic owners
+		owners, err := getAccessListDynamicOwners(ctx, clt, dynamicList)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		dynamicOwners = append(dynamicOwners, owners...)
+	}
+
+	return dynamicOwners, nil
+}
+
 func (a AccessListMembershipChecker) recursiveIsAccessListMemberCheck(ctx context.Context, identity tlsca.Identity, accessList *accesslist.AccessList) error {
 	seen := map[string]struct{}{}
 	queue := []string{accessList.GetName()}
-	depth := 0
 	membershipErr := trace.NotFound("user %s is not a member of the access list or its parents", identity.Username)
 
 	for len(queue) > 0 {
-		depth++
-		if depth > accesslist.MaxAllowedDepth {
-			return trace.AccessDenied("exceeded maximum depth of %d while checking for access list membership", accesslist.MaxAllowedDepth)
-		}
-
 		pal := queue[0]
 		queue = queue[1:]
 
@@ -356,63 +381,38 @@ func (a AccessListMembershipChecker) recursiveIsAccessListMemberCheck(ctx contex
 
 func recursiveIsAccessListOwnerCheck(ctx context.Context, members AccessListsAndMembersGetter, identity tlsca.Identity, accessList *accesslist.AccessList) error {
 	seen := map[string]struct{}{}
-	queue := []string{accessList.GetName()}
-	depth := 0
-	ownershipErr := trace.NotFound("user %s is not an owner of the access list or its parents", identity.Username)
+	queue := []*accesslist.AccessList{accessList}
 
-	for _, owner := range accessList.GetOwners() {
-		if owner.MembershipKind == accesslist.MembershipKindList {
-			queue = append(queue, owner.Name)
+	dynamicLists, err := getAccessListDynamicOwners(ctx, members, accessList)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+
+	// avoid adding any duplicates
+	for _, list := range dynamicLists {
+		if _, ok := seen[list.GetName()]; ok {
+			continue
 		}
+		seen[list.GetName()] = struct{}{}
+		queue = append(queue, list)
 	}
 
 	for len(queue) > 0 {
-		depth++
-		if depth > accesslist.MaxAllowedDepth {
-			return trace.AccessDenied("exceeded maximum depth of %d while checking for access list ownership", accesslist.MaxAllowedDepth)
-		}
-
 		pal := queue[0]
 		queue = queue[1:]
 
-		member, err := members.GetAccessListMember(ctx, pal, identity.Username)
-
-		if err != nil && !trace.IsNotFound(err) {
-			return trace.Wrap(err)
-		}
-		if trace.IsNotFound(err) {
-			subAccessListMembers, err := getAccessListDynamicMembers(ctx, members, pal)
-			if err != nil {
-				return trace.NotFound("error finding access list %s", pal)
+		dynamicOwners := pal.GetOwners()
+		for _, owner := range dynamicOwners {
+			if owner.MembershipKind == accesslist.MembershipKindList || owner.Name != identity.Username {
+				continue
 			}
-			for _, next := range subAccessListMembers {
-				if _, ok := seen[next]; ok {
-					continue
-				}
-				seen[next] = struct{}{}
-				queue = append(queue, next)
+			if UserMeetsRequirements(identity, pal.Spec.OwnershipRequires) {
+				return nil
 			}
-			continue
-		}
-
-		expires := member.Spec.Expires
-		if !expires.IsZero() && !time.Now().Before(expires) {
-			// avoid non-deterministic behavior here - if user's ownership is expired, then
-			// continue checking, in case their ownership in a related list is still valid
-			ownershipErr = trace.AccessDenied("user %s's ownership has expired in the access list", identity.Username)
-			continue
-		}
-
-		subAccessList, err := members.GetAccessList(ctx, pal)
-		if err != nil {
-			return trace.Wrap(err)
-		}
-		if UserMeetsRequirements(identity, subAccessList.Spec.OwnershipRequires) {
-			return nil
 		}
 	}
 
-	return ownershipErr
+	return trace.NotFound("user %s is not an owner of the access list or its parents", identity.Username)
 }
 
 // IsAccessListMember will return true if the user is a member for the current list.
