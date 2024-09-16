@@ -157,6 +157,7 @@ export type PluginSpec =
   | PluginOktaSpec
   | PluginSlackSpec
   | PluginMattermostSpec
+  | PluginMsTeamsSpec
   | PluginOpsgenieSpec;
 
 // PluginKind represents the type of the plugin
@@ -213,6 +214,13 @@ export type PluginMattermostSpec = {
   channel: string;
   team: string;
   reportToEmail: string;
+};
+
+export type PluginMsTeamsSpec = {
+  appID: string;
+  tenantID: string;
+  teamsAppID: string;
+  region: string;
 };
 
 export type PluginOpsgenieSpec = {
