@@ -107,10 +107,14 @@ func (a *App) init(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, initTimeout)
 	defer cancel()
 
-	var err error
-	a.apiClient, err = common.GetTeleportClient(ctx, a.conf.Teleport)
-	if err != nil {
-		return trace.Wrap(err)
+	if a.conf.Client != nil {
+		a.apiClient = a.conf.Client
+	} else {
+		var err error
+		a.apiClient, err = common.GetTeleportClient(ctx, a.conf.Teleport)
+		if err != nil {
+			return trace.Wrap(err)
+		}
 	}
 
 	a.pd = pd.NewCAS(

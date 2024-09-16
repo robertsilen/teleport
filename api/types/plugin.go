@@ -72,6 +72,8 @@ const (
 	PluginTypeEntraID = "entra-id"
 	// PluginTypeSCIM indicates a generic SCIM integration
 	PluginTypeSCIM = "scim"
+	// PluginTypeMSTeams indicates a generic Microsoft Teams integration
+	PluginTypeMSTeams = "msteams"
 )
 
 // PluginSubkind represents the type of the plugin, e.g., access request, MDM etc.
