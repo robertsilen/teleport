@@ -31,14 +31,12 @@ end of an SSH session.
   - `visudo`
 - (!docs/pages/includes/tctl.mdx!)
 
-## Automatic host user creation
+## Automatic host users
 
-Configure Teleport to create local users when Teleport users start an SSH session.
+In this section, you will configure Teleport to create local users when a
+Teleport user starts an SSH session.
 
 ### Step 1/3. Configure RBAC
-
-In this section, you will configure a Teleport role that enables host user
-creation.  
 
 When a Teleport user accesses an SSH Service instance, Teleport checks each of
 the user's roles that match the instance. If at least one role matches the
@@ -239,9 +237,10 @@ not already exist are created on the host. The `nginxrestarter` user is added to
 the `ubuntu`, `nginx`, and `other` groups, as specified in the `host_groups`
 field.
 
-## Static host user creation
+## Static host users
 
-Configure Teleport to create local users independently of an SSH session.
+In this section, you will configure Teleport to create local users independently
+of an SSH session.
 
 ### Step 1/3. Configure RBAC
 
@@ -260,7 +259,7 @@ Configure Teleport to create local users independently of an SSH session.
 
 1. Restart Teleport on the server.
 
-#### Define a Telport role
+#### Define a Teleport role
 
 The following role specification allows users to log in as `nginxrestarter` on
 any matching server. Add this content to a file called `auto-users.yaml`:
@@ -340,7 +339,7 @@ be matched by more than one of them.
 
 Create the static host user:
 
-```code:
+```code
 $ tctl create -f nginxrestarter.yaml
 # static_host_user 'nginxrestarter' has been created
 ```
