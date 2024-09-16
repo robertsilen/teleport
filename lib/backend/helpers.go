@@ -65,7 +65,7 @@ func (l *LockConfiguration) CheckAndSetDefaults() error {
 	if l.Backend == nil {
 		return trace.BadParameter("missing Backend")
 	}
-	if len(l.LockName) == 0 {
+	if l.LockName.IsZero() {
 		return trace.BadParameter("missing LockName")
 	}
 	if l.TTL == 0 {

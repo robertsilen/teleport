@@ -187,7 +187,7 @@ type ConditionalAction struct {
 
 // Check validates the basic correctness of the conditional action.
 func (c *ConditionalAction) Check() error {
-	if len(c.Key) == 0 {
+	if len(c.Key.components) == 0 {
 		return trace.BadParameter("conditional action missing required parameter 'Key'")
 	}
 

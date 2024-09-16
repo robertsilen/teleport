@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"slices"
 	"sort"
 	"time"
 
@@ -168,7 +167,7 @@ func IterateRange(ctx context.Context, bk Backend, startKey, endKey Key, limit i
 // impl for a given backend may be used.
 func StreamRange(ctx context.Context, bk Backend, startKey, endKey Key, pageSize int) stream.Stream[Item] {
 	return stream.PageFunc[Item](func() ([]Item, error) {
-		if startKey == nil {
+		if startKey.IsZero() {
 			return nil, io.EOF
 		}
 		rslt, err := bk.GetRange(ctx, startKey, endKey, pageSize)
@@ -176,7 +175,7 @@ func StreamRange(ctx context.Context, bk Backend, startKey, endKey Key, pageSize
 			return nil, trace.Wrap(err)
 		}
 		if len(rslt.Items) < pageSize {
-			startKey = nil
+			startKey = Key{}
 		} else {
 			startKey = RangeEnd(rslt.Items[pageSize-1].Key)
 		}
@@ -319,20 +318,7 @@ var noEnd = []byte{0}
 
 // RangeEnd returns end of the range for a given key.
 func RangeEnd(key Key) Key {
-	k := slices.Clone(key)
-
-	switch {
-	case len(key) == 1 && key[0] == "":
-		k[0] = string(noEnd)
-	case len(key) > 1 && key[len(key)-1] == "":
-		next := nextKey([]byte(key[len(key)-2] + Separator))
-		k[len(k)-2] = string(next)
-	default:
-		next := nextKey([]byte(k[len(k)-1]))
-		k[len(k)-1] = string(next)
-	}
-
-	return k
+	return KeyFromString(string(nextKey([]byte(key.String()))))
 }
 
 // HostID is a derivation of a KeyedItem that allows the host id

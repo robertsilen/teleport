@@ -157,7 +157,7 @@ func (m *Memory) Clock() clockwork.Clock {
 
 // Create creates item if it does not exist
 func (m *Memory) Create(ctx context.Context, i backend.Item) (*backend.Lease, error) {
-	if len(i.Key) == 0 {
+	if i.Key.IsZero() {
 		return nil, trace.BadParameter("missing parameter key")
 	}
 	m.Lock()
@@ -180,7 +180,7 @@ func (m *Memory) Create(ctx context.Context, i backend.Item) (*backend.Lease, er
 
 // Get returns a single item or not found error
 func (m *Memory) Get(ctx context.Context, key backend.Key) (*backend.Item, error) {
-	if len(key) == 0 {
+	if key.IsZero() {
 		return nil, trace.BadParameter("missing parameter key")
 	}
 	m.Lock()
@@ -195,7 +195,7 @@ func (m *Memory) Get(ctx context.Context, key backend.Key) (*backend.Item, error
 
 // Update updates item if it exists, or returns NotFound error
 func (m *Memory) Update(ctx context.Context, i backend.Item) (*backend.Lease, error) {
-	if len(i.Key) == 0 {
+	if i.Key.IsZero() {
 		return nil, trace.BadParameter("missing parameter key")
 	}
 	m.Lock()
@@ -221,7 +221,7 @@ func (m *Memory) Update(ctx context.Context, i backend.Item) (*backend.Lease, er
 // Put puts value into backend (creates if it does not
 // exist, updates it otherwise)
 func (m *Memory) Put(ctx context.Context, i backend.Item) (*backend.Lease, error) {
-	if len(i.Key) == 0 {
+	if i.Key.IsZero() {
 		return nil, trace.BadParameter("missing parameter key")
 	}
 	m.Lock()
@@ -244,7 +244,7 @@ func (m *Memory) Put(ctx context.Context, i backend.Item) (*backend.Lease, error
 // Delete deletes item by key, returns NotFound error
 // if item does not exist
 func (m *Memory) Delete(ctx context.Context, key backend.Key) error {
-	if len(key) == 0 {
+	if key.IsZero() {
 		return trace.BadParameter("missing parameter key")
 	}
 	m.Lock()
@@ -269,10 +269,10 @@ func (m *Memory) Delete(ctx context.Context, key backend.Key) error {
 // DeleteRange deletes range of items with keys between startKey and endKey
 // Note that elements deleted by range do not produce any events
 func (m *Memory) DeleteRange(ctx context.Context, startKey, endKey backend.Key) error {
-	if len(startKey) == 0 {
+	if startKey.IsZero() {
 		return trace.BadParameter("missing parameter startKey")
 	}
-	if len(endKey) == 0 {
+	if endKey.IsZero() {
 		return trace.BadParameter("missing parameter endKey")
 	}
 	m.Lock()
@@ -294,10 +294,10 @@ func (m *Memory) DeleteRange(ctx context.Context, startKey, endKey backend.Key) 
 
 // GetRange returns query range
 func (m *Memory) GetRange(ctx context.Context, startKey, endKey backend.Key, limit int) (*backend.GetResult, error) {
-	if len(startKey) == 0 {
+	if startKey.IsZero() {
 		return nil, trace.BadParameter("missing parameter startKey")
 	}
-	if len(endKey) == 0 {
+	if endKey.IsZero() {
 		return nil, trace.BadParameter("missing parameter endKey")
 	}
 	if limit <= 0 {
@@ -315,7 +315,7 @@ func (m *Memory) GetRange(ctx context.Context, startKey, endKey backend.Key, lim
 
 // KeepAlive updates TTL on the lease
 func (m *Memory) KeepAlive(ctx context.Context, lease backend.Lease, expires time.Time) error {
-	if len(lease.Key) == 0 {
+	if lease.Key.IsZero() {
 		return trace.BadParameter("missing parameter key")
 	}
 
@@ -344,10 +344,10 @@ func (m *Memory) KeepAlive(ctx context.Context, lease backend.Lease, expires tim
 
 // CompareAndSwap compares item with existing item and replaces it with replaceWith item
 func (m *Memory) CompareAndSwap(ctx context.Context, expected backend.Item, replaceWith backend.Item) (*backend.Lease, error) {
-	if len(expected.Key) == 0 {
+	if expected.Key.IsZero() {
 		return nil, trace.BadParameter("missing parameter Key")
 	}
-	if len(replaceWith.Key) == 0 {
+	if replaceWith.Key.IsZero() {
 		return nil, trace.BadParameter("missing parameter Key")
 	}
 	if expected.Key.Compare(replaceWith.Key) != 0 {
@@ -379,7 +379,7 @@ func (m *Memory) CompareAndSwap(ctx context.Context, expected backend.Item, repl
 }
 
 func (m *Memory) ConditionalDelete(ctx context.Context, key backend.Key, rev string) error {
-	if len(key) == 0 || (rev == "" && !m.Mirror) {
+	if key.IsZero() || (rev == "" && !m.Mirror) {
 		return trace.Wrap(backend.ErrIncorrectRevision)
 	}
 
@@ -406,7 +406,7 @@ func (m *Memory) ConditionalDelete(ctx context.Context, key backend.Key, rev str
 }
 
 func (m *Memory) ConditionalUpdate(ctx context.Context, i backend.Item) (*backend.Lease, error) {
-	if len(i.Key) == 0 || (i.Revision == "" && !m.Mirror) {
+	if i.Key.IsZero() || (i.Revision == "" && !m.Mirror) {
 		return nil, trace.Wrap(backend.ErrIncorrectRevision)
 	}
 

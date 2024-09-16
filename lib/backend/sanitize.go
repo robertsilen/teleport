@@ -37,14 +37,14 @@ var allowPattern = regexp.MustCompile(`^[0-9A-Za-z@_:.\-/+]*$`)
 
 // isKeySafe checks if the passed in key conforms to whitelist
 func isKeySafe(key Key) bool {
-	for i, k := range key {
+	for i, k := range key.Components() {
 		switch k {
 		case string(noEnd):
 			continue
 		case ".", "..":
 			return false
 		case "":
-			return i != len(key)
+			return i != len(key.Components())
 		}
 
 		if strings.Contains(k, Separator) {

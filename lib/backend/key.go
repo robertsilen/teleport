@@ -18,14 +18,16 @@ package backend
 
 import (
 	"bytes"
-	"cmp"
 	"fmt"
 	"slices"
 	"strings"
 )
 
 // Key is the unique identifier for an [Item].
-type Key []string
+type Key struct {
+	components []string
+	str        string
+}
 
 // Separator is used as a separator between key parts
 const Separator = "/"
@@ -33,7 +35,7 @@ const Separator = "/"
 // NewKey joins parts into path separated by Separator,
 // makes sure path always starts with Separator ("/")
 func NewKey(parts ...string) Key {
-	return parts
+	return Key{components: parts, str: Separator + strings.Join(parts, Separator)}
 }
 
 // KeyFromString creates a Key from its textual representation.
@@ -44,9 +46,10 @@ func KeyFromString(key string) Key {
 
 	k := strings.Split(key, Separator)
 	if k[0] == "" && string(key[0]) == Separator {
-		return k[1:]
+		return Key{components: k[1:], str: key}
 	}
-	return k
+
+	return Key{components: k, str: key}
 }
 
 // ExactKey is like Key, except a Separator is appended to the result
@@ -54,159 +57,67 @@ func KeyFromString(key string) Key {
 // math child paths and not other paths that have the resulting path
 // as a prefix.
 func ExactKey(parts ...string) Key {
-	return append(NewKey(parts...), "")
+	return NewKey(append(parts, "")...)
 }
 
 // String returns the textual representation of the key with
 // each component concatenated together via the [Separator].
 func (k Key) String() string {
-	if len(k) == 0 {
-		return ""
-	}
+	return k.str
+}
 
-	return Separator + strings.Join(k, Separator)
+func (k Key) IsZero() bool {
+	return len(k.components) == 0
 }
 
 // HasPrefix reports whether the key begins with prefix.
 func (k Key) HasPrefix(prefix Key) bool {
-	if len(prefix) == 0 || (len(prefix) == 1 && prefix[0] == "") {
-		return true
-	}
-
-	prefixLen := len(prefix)
-	if prefix.isExactKey() {
-		prefixLen--
-	}
-
-	kLen := len(k)
-	if k.isExactKey() {
-		kLen--
-	}
-
-	n := min(kLen, prefixLen)
-
-	for i := 0; i < n; i++ {
-		if k[i] != prefix[i] {
-			return false
-		}
-	}
-
-	return prefixLen <= kLen
+	return strings.HasPrefix(k.str, prefix.str)
 }
 
 // TrimPrefix returns the key without the provided leading prefix string.
 // If the key doesn't start with prefix, it is returned unchanged.
 func (k Key) TrimPrefix(prefix Key) Key {
-	if len(k) == 0 {
-		return k
-	}
-
-	n := min(len(k), len(prefix))
-
-	lastIndex := -1
-	for i := 0; i < n; i++ {
-		if k[i] != prefix[i] {
-			break
-		}
-		lastIndex = i
-	}
-
-	switch lastIndex {
-	case len(k) - 1:
-		return Key{}
-	case -1:
-		return k
-	default:
-		return k[lastIndex+1:]
-	}
+	return KeyFromString(strings.TrimPrefix(k.str, prefix.str))
 }
 
 func (k Key) PrependKey(p Key) Key {
-	return append(slices.Clone(p), slices.Clone(k)...)
+	return NewKey(append(slices.Clone(p.components), slices.Clone(k.components)...)...)
 }
 
 func (k Key) AppendKey(p Key) Key {
-	return append(slices.Clone(k), slices.Clone(p)...)
+	return p.PrependKey(k)
 }
 
 func (k Key) ExactKey() Key {
-	if k[len(k)-1] != "" {
-		return ExactKey(k...)
+	if k.components[len(k.components)-1] != "" {
+		return ExactKey(k.components...)
 	}
 
 	return k
 }
 
 func (k Key) isExactKey() bool {
-	return len(k) > 1 && k[len(k)-1] == ""
+	return len(k.components) > 1 && k.components[len(k.components)-1] == ""
 }
 
 // HasSuffix reports whether the key ends with suffix.
 func (k Key) HasSuffix(suffix Key) bool {
-	for i, j := len(k)-1, len(suffix)-1; i >= 0 && j >= 0; i, j = i-1, j-1 {
-		if k[i] != suffix[j] && i == len(k)-1 {
-			return false
-		}
-	}
-
-	return len(suffix) <= len(k)
+	return strings.HasPrefix(k.str, suffix.str)
 }
 
 // TrimSuffix returns the key without the provided trailing suffix string.
 // If the key doesn't end with suffix, it is returned unchanged.
 func (k Key) TrimSuffix(suffix Key) Key {
-	if len(k) == 0 {
-		return k
-	}
-
-	lastIndex := len(k)
-	for i, j := len(k)-1, len(suffix)-1; i >= 0 && j >= 0; i, j = i-1, j-1 {
-		if k[i] != suffix[j] && i == len(k)-1 {
-			break
-		}
-
-		lastIndex = i
-	}
-
-	switch lastIndex {
-	case 0:
-		return Key{}
-	case len(k):
-		return k
-	default:
-		return k[:lastIndex]
-	}
+	return NewKey(strings.TrimSuffix(k.str, suffix.str))
 }
 
 func (k Key) Components() []string {
-	return k
+	return slices.Clone(k.components)
 }
 
 func (k Key) Compare(o Key) int {
-	if len(o) == 1 && o[0] == string(noEnd) {
-		return -1
-	}
-
-	n := min(len(k), len(o))
-	for i := 0; i < n; i++ {
-		compare := strings.Compare(k[i], o[i])
-		if compare != 0 {
-			return compare
-		}
-	}
-
-	switch len(k) {
-	case len(o):
-		return 0
-	case 0:
-		return -1
-	default:
-		if len(o) == 0 {
-			return 1
-		}
-
-		return cmp.Compare(len(k), len(o))
-	}
+	return strings.Compare(k.str, o.str)
 }
 
 // Scan implement sql.Scanner, allowing a [Key] to
@@ -220,15 +131,13 @@ func (k *Key) Scan(scan any) error {
 		}
 
 		raw := bytes.Clone(key)
-		split := strings.Split(string(raw), Separator)
-		*k = split[1:]
+		*k = KeyFromString(string(raw))
 	case string:
 		if key == "" {
 			return nil
 		}
 
-		split := strings.Split(key, Separator)
-		*k = split[1:]
+		*k = KeyFromString(key)
 	default:
 		return fmt.Errorf("invalid Key type %T", scan)
 	}

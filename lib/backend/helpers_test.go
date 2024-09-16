@@ -94,7 +94,7 @@ func TestLockConfiguration_CheckAndSetDefaults(t *testing.T) {
 			err := cfg.CheckAndSetDefaults()
 			if tt.wantErr == "" {
 				require.NoError(t, err, "CheckAndSetDefaults return unexpected err")
-				require.Empty(t, cmp.Diff(tt.want, cfg))
+				require.Empty(t, cmp.Diff(tt.want, cfg, cmp.AllowUnexported(Key{})))
 			} else {
 				require.ErrorContains(t, err, tt.wantErr)
 			}
@@ -153,7 +153,7 @@ func TestRunWhileLockedConfigCheckAndSetDefaults(t *testing.T) {
 			err := cfg.CheckAndSetDefaults()
 			if tt.wantErr == "" {
 				require.NoError(t, err, "CheckAndSetDefaults return unexpected err")
-				require.Empty(t, cmp.Diff(tt.want, cfg))
+				require.Empty(t, cmp.Diff(tt.want, cfg, cmp.AllowUnexported(Key{})))
 			} else {
 				require.ErrorContains(t, err, tt.wantErr)
 			}

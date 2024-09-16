@@ -25,15 +25,15 @@ import (
 )
 
 func TestKey(t *testing.T) {
-	k1 := backend.Key{"test"}
+	k1 := backend.Key{}
 	k2 := backend.NewKey("test")
 	k3 := backend.ExactKey("test")
 
-	assert.Equal(t, k1, k2)
+	assert.NotEqual(t, k1, k2)
 	assert.NotEqual(t, k2, k3)
 	assert.NotEqual(t, k1, k3)
 
-	assert.Equal(t, "/test", k1.String())
+	assert.Equal(t, "", k1.String())
 	assert.Equal(t, "/test", k2.String())
 	assert.Equal(t, "/test/", k3.String())
 }
@@ -45,7 +45,8 @@ func TestKeyString(t *testing.T) {
 		key      backend.Key
 	}{
 		{
-			name: "empty key produces empty string",
+			name:     "empty key produces separator",
+			expected: "/",
 		},
 		{
 			name:     "empty new key produces empty string",
@@ -79,7 +80,7 @@ func TestKeyString(t *testing.T) {
 		},
 		{
 			name:     "noend key",
-			key:      backend.Key{string([]byte{0})},
+			key:      backend.NewKey(string([]byte{0})),
 			expected: "/\x00",
 		},
 	}
@@ -122,7 +123,7 @@ func TestKeyComponents(t *testing.T) {
 		},
 		{
 			name:     "key without separator",
-			key:      backend.Key{"testing"},
+			key:      backend.NewKey("testing"),
 			expected: []string{"testing"},
 		},
 	}
@@ -519,10 +520,16 @@ func TestKeyCompare(t *testing.T) {
 			expected: 1,
 		},
 		{
-			name:     "special characters",
-			key:      backend.NewKey("fish+"),
-			other:    backend.NewKey("fish"),
+			name:     "empty keys are equal",
+			key:      backend.NewKey("web", "users", "fish+", "params"),
+			other:    backend.NewKey("web", "users", "fish", "params"),
 			expected: -1,
+		},
+		{
+			name:     "empty keys are equal",
+			key:      backend.NewKey("web", "users", "fish", "params"),
+			other:    backend.NewKey("web", "users", "fish+", "params"),
+			expected: 1,
 		},
 	}
 	for _, test := range tests {

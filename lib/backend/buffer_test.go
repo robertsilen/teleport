@@ -177,7 +177,7 @@ func TestWatcherCreationGracePeriod(t *testing.T) {
 
 	// emit enough events to create a backlog
 	for i := 0; i < queueSize*2; i++ {
-		b.Emit(Event{Item: Item{Key: Key{Separator}}})
+		b.Emit(Event{Item: Item{Key: NewKey(Separator)}})
 	}
 
 	select {
@@ -192,7 +192,7 @@ func TestWatcherCreationGracePeriod(t *testing.T) {
 	// advance well past the backlog grace period, but not past the creation grace period
 	clock.Advance(backlogGracePeriod * 2)
 
-	b.Emit(Event{Item: Item{Key: Key{Separator}}})
+	b.Emit(Event{Item: Item{Key: NewKey(Separator)}})
 
 	select {
 	case <-w.Done():
@@ -203,7 +203,7 @@ func TestWatcherCreationGracePeriod(t *testing.T) {
 	// advance well past creation grace period
 	clock.Advance(creationGracePeriod)
 
-	b.Emit(Event{Item: Item{Key: Key{Separator}}})
+	b.Emit(Event{Item: Item{Key: NewKey(Separator)}})
 	select {
 	case <-w.Done():
 	default:
@@ -265,7 +265,7 @@ func TestRemoveRedundantPrefixes(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		require.Empty(t, cmp.Diff(RemoveRedundantPrefixes(tc.in), tc.out))
+		require.Empty(t, cmp.Diff(RemoveRedundantPrefixes(tc.in), tc.out, cmp.AllowUnexported(Key{})))
 	}
 }
 
