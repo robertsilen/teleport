@@ -684,12 +684,6 @@ func RetryWithRelogin(ctx context.Context, tc *TeleportClient, fn func() error, 
 		return trace.Wrap(err)
 	}
 
-	if opt.afterLoginHook != nil {
-		if err := opt.afterLoginHook(); err != nil {
-			return trace.Wrap(err)
-		}
-	}
-
 	return fn()
 }
 
