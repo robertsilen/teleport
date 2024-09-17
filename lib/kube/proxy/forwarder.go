@@ -1816,10 +1816,14 @@ func (f *Forwarder) portForward(authCtx *authContext, w http.ResponseWriter, req
 // Go client uses SPDY while other clients still require WebSockets.
 // This function will run until the end of the execution of the request.
 func runPortForwarding(req portForwardRequest) error {
-	if wsstream.IsWebSocketRequest(req.httpRequest) {
+	switch {
+	case wsstream.IsWebSocketRequestWithTunnelingProtocol(req.httpRequest):
+		return trace.Wrap(runPortForwardingTunneledHTTPStreams(req))
+	case wsstream.IsWebSocketRequest(req.httpRequest):
 		return trace.Wrap(runPortForwardingWebSocket(req))
+	default:
+		return trace.Wrap(runPortForwardingHTTPStreams(req))
 	}
-	return trace.Wrap(runPortForwardingHTTPStreams(req))
 }
 
 const (
